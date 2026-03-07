@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { useDatabase } from '../src/hooks/useDatabase';
+import { AppProvider } from '../src/hooks/useAppContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,7 +22,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <AppProvider>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -40,6 +41,6 @@ export default function RootLayout() {
           }}
         />
       </Stack>
-    </>
+    </AppProvider>
   );
 }

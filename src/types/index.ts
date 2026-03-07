@@ -8,6 +8,8 @@ export type GameStatus =
 
 export type GamePriority = 'high' | 'medium' | 'low';
 
+export type Platform = 'steam' | 'playstation' | 'xbox' | 'nintendo' | 'emulator' | 'other';
+
 export interface Game {
   id: number;
   steam_app_id: number;
@@ -15,6 +17,7 @@ export interface Game {
   cover_url: string;
   status: GameStatus;
   priority: GamePriority;
+  platform: Platform;
   playtime_minutes: number;
   hltb_main_story: number | null;
   hltb_completionist: number | null;
@@ -73,12 +76,32 @@ export interface Recommendation {
   score: number;
 }
 
+export interface GamingSession {
+  id: number;
+  game_id: number;
+  duration_minutes: number;
+  session_date: string;
+  notes: string;
+}
+
+export interface BacklogChallenge {
+  id: number;
+  type: string;
+  target: number;
+  progress: number;
+  status: 'active' | 'completed' | 'failed';
+  month_year: string;
+}
+
+export type Theme = 'cyberpunk' | 'neon' | 'oled' | 'retro' | 'ps_blue' | 'dark' | 'light';
+
 export interface AppSettings {
   steam_id: string;
   steam_api_key: string;
   show_nsfw: boolean;
   default_sort: string;
-  theme: 'dark' | 'light';
+  theme: Theme;
+  is_premium: boolean;
 }
 
 export interface StatusConfig {

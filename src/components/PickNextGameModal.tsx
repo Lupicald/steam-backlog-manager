@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -17,16 +17,23 @@ import { GameCover } from './GameCover';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { formatHLTBTime } from '../utils/formatters';
-import { COLORS } from '../utils/colors';
+import { useAppContext } from '../hooks/useAppContext';
 
 const { width } = Dimensions.get('window');
 
 interface PickNextGameModalProps {
   visible: boolean;
   recommendation: Recommendation | null;
-  onReroll: () => void;
+  onReroll: (hours?: number) => void;
   onClose: () => void;
 }
+
+const SESSION_OPTIONS = [
+  { label: 'Any', value: undefined },
+  { label: '1 Hr', value: 1 },
+  { label: '2 Hr', value: 2 },
+  { label: '4 Hr', value: 4 },
+];
 
 export function PickNextGameModal({
   visible,
@@ -35,6 +42,13 @@ export function PickNextGameModal({
   onClose,
 }: PickNextGameModalProps) {
   const router = useRouter();
+  const { themeColors } = useAppContext();
+  const styles = getStyles(themeColors);
+  const [sessionHours, setSessionHours] = useState<number | undefined>(undefined);
+
+  const handleReroll = () => {
+    onReroll(sessionHours);
+  };
 
   const handleOpen = () => {
     onClose();
@@ -59,7 +73,7 @@ export function PickNextGameModal({
         <View style={styles.sheet}>
           <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
           <LinearGradient
-            colors={[COLORS.accent + '30', COLORS.accentAlt + '10']}
+            colors={[themeColors.accent + '30', themeColors.accent + '10']}
             style={StyleSheet.absoluteFill}
           />
 
@@ -69,14 +83,14 @@ export function PickNextGameModal({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerIcon}>
-              <Ionicons name="dice" size={22} color={COLORS.accent} />
+              <Ionicons name="dice" size={22} color={themeColors.accent} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle}>Pick My Next Game</Text>
               <Text style={styles.headerSub}>Based on priority, time & habits</Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Ionicons name="close-circle" size={24} color={COLORS.textMuted} />
+              <Ionicons name="close-circle" size={24} color={themeColors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -100,7 +114,7 @@ export function PickNextGameModal({
 
                   {recommendation.game.hltb_main_story ? (
                     <View style={styles.timeRow}>
-                      <Ionicons name="time-outline" size={14} color={COLORS.cyan} />
+                      <Ionicons name="time-outline" size={14} color={themeColors.teal} />
                       <Text style={styles.timeText}>
                         Main story ~{formatHLTBTime(recommendation.game.hltb_main_story)}
                       </Text>
@@ -108,22 +122,47 @@ export function PickNextGameModal({
                   ) : null}
 
                   {/* Reason chip */}
-                  <View style={styles.reasonChip}>
-                    <Ionicons name="sparkles" size={12} color={COLORS.violet} />
+                  <View style={styles.reasonCard}>
+                    <Ionicons name="sparkles" size={12} color={themeColors.violet} />
                     <Text style={styles.reasonText}>{recommendation.reason}</Text>
                   </View>
                 </View>
               </View>
 
+              {/* Session Mode Toggles */}
+              <View style={styles.sessionWrap}>
+                <Text style={styles.sessionLabel}>Session Available Time:</Text>
+                <View style={styles.sessionChipsRow}>
+                  {SESSION_OPTIONS.map(opt => {
+                    const isActive = sessionHours === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.label}
+                        activeOpacity={0.7}
+                        style={[styles.sessionChip, isActive && { backgroundColor: themeColors.accent, borderColor: themeColors.accent }]}
+                        onPress={() => {
+                          setSessionHours(opt.value);
+                          onReroll(opt.value);
+                        }}
+                      >
+                        <Text style={[styles.sessionChipText, isActive && { color: '#fff' }]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               <View style={styles.actions}>
-                <TouchableOpacity style={styles.rerollButton} onPress={onReroll} activeOpacity={0.82}>
-                  <Ionicons name="refresh" size={18} color={COLORS.textPrimary} />
+                <TouchableOpacity style={styles.rerollButton} onPress={handleReroll} activeOpacity={0.82}>
+                  <Ionicons name="refresh" size={18} color={themeColors.textPrimary} />
                   <Text style={styles.rerollText}>Reroll</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.ctaButton} onPress={handleOpen} activeOpacity={0.85}>
                   <LinearGradient
-                    colors={[COLORS.accent, COLORS.accentAlt]}
+                    colors={[themeColors.accent, themeColors.violet]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={StyleSheet.absoluteFill}
@@ -135,7 +174,7 @@ export function PickNextGameModal({
             </>
           ) : (
             <View style={styles.empty}>
-              <Ionicons name="library-outline" size={48} color={COLORS.textMuted} />
+              <Ionicons name="library-outline" size={48} color={themeColors.textMuted} />
               <Text style={styles.emptyText}>No games to recommend yet.</Text>
               <Text style={styles.emptySubText}>
                 Import your Steam library and add some games to your backlog.
@@ -148,7 +187,7 @@ export function PickNextGameModal({
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors: any) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -162,7 +201,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: COLORS.glassBorder,
+    borderColor: themeColors.glassBorder,
     overflow: 'hidden',
     padding: 24,
     paddingBottom: 40,
@@ -170,7 +209,7 @@ const styles = StyleSheet.create({
   handle: {
     width: 36,
     height: 4,
-    backgroundColor: COLORS.textMuted,
+    backgroundColor: themeColors.textMuted,
     borderRadius: 99,
     alignSelf: 'center',
     marginBottom: 20,
@@ -186,18 +225,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: COLORS.accent + '22',
+    backgroundColor: themeColors.accent + '22',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
   headerSub: {
-    color: COLORS.textMuted,
+    color: themeColors.textMuted,
     fontSize: 12,
     marginTop: 1,
   },
@@ -208,7 +247,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   gameTitle: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 20,
     fontWeight: '800',
     letterSpacing: -0.4,
@@ -224,26 +263,57 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   timeText: {
-    color: COLORS.cyan,
+    color: themeColors.teal,
     fontSize: 13,
     fontWeight: '600',
   },
-  reasonChip: {
+  reasonCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: COLORS.violet + '18',
-    borderRadius: 99,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: themeColors.violet + '18',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 4,
     borderWidth: 1,
-    borderColor: COLORS.violet + '33',
+    borderColor: themeColors.violet + '33',
   },
   reasonText: {
-    color: COLORS.violet,
+    color: themeColors.violet,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 20,
+    flex: 1,
+  },
+  sessionWrap: {
+    marginTop: 20,
+  },
+  sessionLabel: {
+    color: themeColors.textMuted,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sessionChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  sessionChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: themeColors.glassBorder,
+    backgroundColor: themeColors.card,
+  },
+  sessionChipText: {
+    color: themeColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   ctaButton: {
     flex: 1,
@@ -265,15 +335,15 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glass,
+    borderColor: themeColors.glassBorder,
+    backgroundColor: themeColors.glass,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   rerollText: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -289,12 +359,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyText: {
-    color: COLORS.textSecondary,
+    color: themeColors.textSecondary,
     fontSize: 16,
     fontWeight: '600',
   },
   emptySubText: {
-    color: COLORS.textMuted,
+    color: themeColors.textMuted,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,

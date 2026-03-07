@@ -36,18 +36,20 @@ export function upsertGame(
   title: string,
   coverUrl: string,
   playtimeMinutes: number,
-  lastPlayed: string | null
+  lastPlayed: string | null,
+  platform: string = 'steam'
 ): void {
   const db = getDatabase();
   db.runSync(
-    `INSERT INTO games (steam_app_id, title, cover_url, playtime_minutes, last_played)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO games (steam_app_id, title, cover_url, playtime_minutes, last_played, platform)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(steam_app_id) DO UPDATE SET
        title            = excluded.title,
        cover_url        = excluded.cover_url,
        playtime_minutes = excluded.playtime_minutes,
-       last_played      = excluded.last_played`,
-    [steamAppId, title, coverUrl, playtimeMinutes, lastPlayed]
+       last_played      = excluded.last_played,
+       platform         = excluded.platform`,
+    [steamAppId, title, coverUrl, playtimeMinutes, lastPlayed, platform]
   );
 }
 
@@ -86,7 +88,7 @@ export function updateGameNotes(id: number, notes: string): void {
 
 export function updateGame(
   id: number,
-  fields: Partial<Pick<Game, 'status' | 'priority' | 'progress_percentage' | 'notes' | 'exclude_from_backlog'>>
+  fields: Partial<Pick<Game, 'status' | 'priority' | 'progress_percentage' | 'notes' | 'exclude_from_backlog' | 'playtime_minutes' | 'last_played'>>
 ): void {
   const db = getDatabase();
   const entries = Object.entries(fields);
@@ -194,7 +196,8 @@ export function getAllSettings(): AppSettings {
     steam_api_key: getSetting('steam_api_key'),
     default_sort: getSetting('default_sort') || 'priority',
     show_nsfw: getSetting('show_nsfw') === 'true',
-    theme: 'dark',
+    theme: (getSetting('theme') || 'dark') as AppSettings['theme'],
+    is_premium: getSetting('is_premium') === 'true',
   };
 }
 
@@ -214,4 +217,44 @@ export function getCandidatesForRecommendation(): Game[] {
       title ASC
     LIMIT 60
   `);
+}
+
+// ─── Gaming Sessions ──────────────────────────────────────────────────────────
+
+export function logGamingSession(gameId: number, durationMinutes: number, notes: string = ''): void {
+  const db = getDatabase();
+  db.runSync(
+    `INSERT INTO gaming_sessions (game_id, duration_minutes, notes) VALUES (?, ?, ?)`,
+    [gameId, durationMinutes, notes]
+  );
+}
+
+export function getGamingSessionsForGame(gameId: number) {
+  const db = getDatabase();
+  return db.getAllSync(`SELECT * FROM gaming_sessions WHERE game_id = ? ORDER BY session_date DESC`, [gameId]);
+}
+
+export function getTotalPlaytimeMinutes(gameId: number): number {
+  const db = getDatabase();
+  const row = db.getFirstSync<{ total: number }>(
+    `SELECT SUM(duration_minutes) as total FROM gaming_sessions WHERE game_id = ?`,
+    [gameId]
+  );
+  return row?.total ?? 0;
+}
+
+// ─── Challenges ───────────────────────────────────────────────────────────────
+
+export function getChallengesForMonth(monthYear: string) {
+  const db = getDatabase();
+  return db.getAllSync(`SELECT * FROM backlog_challenges WHERE month_year = ?`, [monthYear]);
+}
+
+export function upsertChallenge(type: string, target: number, progress: number, status: string, monthYear: string): void {
+  const db = getDatabase();
+  db.runSync(
+    `INSERT INTO backlog_challenges (type, target, progress, status, month_year)
+     VALUES (?, ?, ?, ?, ?)`,
+    [type, target, progress, status, monthYear]
+  );
 }

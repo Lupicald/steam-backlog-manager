@@ -42,3 +42,14 @@ Thumbs.db
 *.aab
 *.ipa
 *.png
+
+# SQLite
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Temporary
+tsc_output.txt
+*.log

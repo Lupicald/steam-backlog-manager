@@ -15,7 +15,8 @@ import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
 import { useGames } from '../../src/hooks/useGames';
 import { GameCard } from '../../src/components/GameCard';
-import { COLORS } from '../../src/utils/colors';
+import { useAppContext } from '../../src/hooks/useAppContext';
+import { ThemeColors } from '../../src/services/themeService';
 import { Game, GameStatus, STATUS_CONFIG } from '../../src/types';
 import { priorityWeight } from '../../src/utils/formatters';
 
@@ -60,6 +61,8 @@ const SHORT_OPTIONS: { key: ShortMode; label: string }[] = [
 ];
 
 export default function LibraryScreen() {
+  const { themeColors } = useAppContext();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const { games, refresh, setStatus, search } = useGames();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<GameStatus | 'all'>('all');
@@ -96,8 +99,8 @@ export default function LibraryScreen() {
           const active = filter === item.key;
           const color =
             item.key === 'all'
-              ? COLORS.accent
-              : STATUS_CONFIG[item.key as GameStatus]?.color ?? COLORS.accent;
+              ? themeColors.accent
+              : STATUS_CONFIG[item.key as GameStatus]?.color ?? themeColors.accent;
 
           return (
             <TouchableOpacity
@@ -115,7 +118,7 @@ export default function LibraryScreen() {
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: active ? color : COLORS.textSecondary },
+                  { color: active ? color : themeColors.textSecondary },
                 ]}
                 numberOfLines={1}
               >
@@ -174,7 +177,7 @@ export default function LibraryScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#0d0d24', '#0a0a14']}
+        colors={[themeColors.bg, themeColors.card]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -187,21 +190,21 @@ export default function LibraryScreen() {
       {/* Search bar */}
       <View style={styles.searchWrap}>
         <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.glass }]} />
-        <Ionicons name="search" size={17} color={COLORS.textMuted} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: themeColors.glass }]} />
+        <Ionicons name="search" size={17} color={themeColors.textMuted} />
         <TextInput
           style={styles.searchInput}
           value={query}
           onChangeText={setQuery}
           placeholder="Search games…"
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={themeColors.textMuted}
           returnKeyType="search"
           autoCapitalize="none"
           autoCorrect={false}
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery('')}>
-            <Ionicons name="close-circle" size={17} color={COLORS.textMuted} />
+            <Ionicons name="close-circle" size={17} color={themeColors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -218,7 +221,7 @@ export default function LibraryScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons name="game-controller-outline" size={48} color={COLORS.textMuted} />
+            <Ionicons name="game-controller-outline" size={48} color={themeColors.textMuted} />
             <Text style={styles.emptyText}>No games found</Text>
           </View>
         }
@@ -282,10 +285,10 @@ function compareGames(a: Game, b: Game, sortMode: SortMode): number {
   }
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors: ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: themeColors.bg,
   },
   header: {
     paddingTop: 60,
@@ -293,13 +296,13 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   title: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: COLORS.textMuted,
+    color: themeColors.textMuted,
     fontSize: 13,
     marginTop: 2,
   },
@@ -307,7 +310,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: themeColors.glassBorder,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
@@ -318,7 +321,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 15,
   },
   tabList: {
@@ -339,7 +342,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: themeColors.glassBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -352,7 +355,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   controlTitle: {
-    color: COLORS.textMuted,
+    color: themeColors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -370,26 +373,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glass,
+    borderColor: themeColors.glassBorder,
+    backgroundColor: themeColors.glass,
     alignItems: 'center',
     justifyContent: 'center',
   },
   controlChipActive: {
-    backgroundColor: COLORS.accent + '18',
-    borderColor: COLORS.accent + '55',
+    backgroundColor: themeColors.accent + '18',
+    borderColor: themeColors.accent + '55',
   },
   shortChipActive: {
-    backgroundColor: COLORS.cyan + '12',
-    borderColor: COLORS.cyan + '55',
+    backgroundColor: themeColors.teal + '12',
+    borderColor: themeColors.teal + '55',
   },
   controlChipText: {
-    color: COLORS.textSecondary,
+    color: themeColors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
   },
   controlChipTextActive: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
   },
   list: {
     paddingHorizontal: 20,
@@ -402,7 +405,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   emptyText: {
-    color: COLORS.textMuted,
+    color: themeColors.textMuted,
     fontSize: 15,
   },
 });

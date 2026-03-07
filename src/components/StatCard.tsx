@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../utils/colors';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface StatCardProps {
   label: string;
@@ -18,14 +18,16 @@ export function StatCard({
   label,
   value,
   icon,
-  color = COLORS.accent,
+  color,
   gradient,
   subtitle,
 }: StatCardProps) {
-  const gradientColors = gradient ?? ([color + '30', color + '10'] as const);
+  const { themeColors } = useAppContext();
+  const finalColor = color || themeColors.accent;
+  const gradientColors = gradient ?? ([finalColor + '30', finalColor + '10'] as const);
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { borderColor: themeColors.glassBorder }]}>
       <BlurView intensity={18} tint="dark" style={StyleSheet.absoluteFill} />
       <LinearGradient
         colors={gradientColors as unknown as string[]}
@@ -33,12 +35,12 @@ export function StatCard({
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={[styles.iconBg, { backgroundColor: color + '22' }]}>
-        <Ionicons name={icon} size={20} color={color} />
+      <View style={[styles.iconBg, { backgroundColor: finalColor + '22' }]}>
+        <Ionicons name={icon} size={20} color={finalColor} />
       </View>
-      <Text style={styles.value}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.value, { color: themeColors.textPrimary }]}>{value}</Text>
+      <Text style={[styles.label, { color: themeColors.textSecondary }]}>{label}</Text>
+      {subtitle ? <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -48,7 +50,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
     padding: 16,
     overflow: 'hidden',
     minHeight: 110,
@@ -62,19 +63,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   value: {
-    color: COLORS.textPrimary,
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   label: {
-    color: COLORS.textSecondary,
     fontSize: 12,
     fontWeight: '500',
     marginTop: 2,
   },
   subtitle: {
-    color: COLORS.textMuted,
     fontSize: 10,
     marginTop: 4,
   },

@@ -18,11 +18,15 @@ import { useFocusEffect } from 'expo-router';
 import { importSteamLibrary } from '../../src/services/steamService';
 import { batchEnrichHLTB } from '../../src/services/howLongToBeatService';
 import { getSetting, setSetting } from '../../src/database/queries';
+import { exportData, importData } from '../../src/services/cloudSyncService';
+import * as DocumentPicker from 'expo-document-picker';
 import { GlassCard } from '../../src/components/GlassCard';
 import { SectionHeader } from '../../src/components/SectionHeader';
-import { COLORS } from '../../src/utils/colors';
+import { useAppContext } from '../../src/hooks/useAppContext';
+import { Theme } from '../../src/types';
 
 export default function SettingsScreen() {
+  const { theme, themeColors, setTheme, isPremium, unlockPremium } = useAppContext();
   const [steamId, setSteamId] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [importing, setImporting] = useState(false);
@@ -94,25 +98,126 @@ export default function SettingsScreen() {
     );
   };
 
+  const handleExportBackup = async () => {
+    try {
+      const path = await exportData();
+      Alert.alert('Backup Exported', `Data exported to ${path}`);
+    } catch (e) {
+      Alert.alert('Export Failed', 'An error occurred while creating the backup.');
+    }
+  };
+
+  const handleImportBackup = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const path = result.assets[0].uri;
+      const success = await importData(path);
+      if (success) {
+        Alert.alert('Backup Imported', 'Data successfully imported from backup.');
+      } else {
+        Alert.alert('Import Failed', 'Failed to import backup data.');
+      }
+    } catch (e) {
+      Alert.alert('Import Failed', 'An error occurred while importing the backup.');
+    }
+  };
+
   const progressPct =
     progress && progress.total > 0
       ? Math.round((progress.done / progress.total) * 100)
       : 0;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient colors={['#000010', '#0a0a14']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>Configure your Steam library</Text>
+          <Text style={[styles.title, { color: themeColors.textPrimary }]}>Settings</Text>
+          <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>Configure your GameStack experience</Text>
         </View>
+
+        {/* Premium Lock */}
+        {!isPremium && (
+          <View style={styles.section}>
+            <GlassCard padding={20} intensity={30} borderColor={themeColors.accent} style={{ overflow: 'hidden' }}>
+              <LinearGradient colors={[`${themeColors.accent}33`, 'transparent']} style={StyleSheet.absoluteFill} />
+              <View style={styles.premiumHeader}>
+                <Ionicons name="star" size={24} color={themeColors.accent} />
+                <Text style={[styles.premiumTitle, { color: themeColors.textPrimary }]}>GameStack Pro</Text>
+              </View>
+              <Text style={[styles.premiumDesc, { color: themeColors.textSecondary }]}>
+                Unlock the Smart Planner, AI Recommend Engine, advanced stats charts, and premium UI Themes.
+              </Text>
+              <TouchableOpacity style={[styles.unlockBtn, { backgroundColor: themeColors.accent }]} onPress={unlockPremium}>
+                <Text style={styles.unlockBtnText}>Unlock for $300 MXN / Lifetime</Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
+        )}
+
+        {/* Theme Settings */}
+        {isPremium && (
+          <View style={styles.section}>
+            <SectionHeader title="App Theme" icon="color-palette" iconColor={themeColors.violet} />
+            <GlassCard padding={16}>
+              <View style={styles.themeGrid}>
+                {['dark', 'light', 'cyberpunk', 'neon', 'oled', 'retro', 'ps_blue'].map((tName) => {
+                  const active = theme === tName;
+                  return (
+                    <TouchableOpacity
+                      key={tName}
+                      style={[
+                        styles.themeItem,
+                        { borderColor: active ? themeColors.accent : themeColors.glassBorder },
+                        active && { backgroundColor: themeColors.accent + '22' }
+                      ]}
+                      onPress={() => setTheme(tName as Theme)}
+                    >
+                      <Text style={[styles.themeLabel, { color: active ? themeColors.accent : themeColors.textMuted }]}>
+                        {tName.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </GlassCard>
+          </View>
+        )}
+
+        {/* Cloud Sync */}
+        {isPremium && (
+          <View style={styles.section}>
+            <SectionHeader title="Cloud Sync" icon="cloud-done-outline" iconColor={themeColors.teal} />
+            <GlassCard padding={16}>
+              <Text style={styles.helpText}>
+                Backup your library offline locally or upload it to your preferred cloud drive.
+              </Text>
+              <View style={{ gap: 10 }}>
+                <ActionButton
+                  label="Export Backup"
+                  icon="arrow-down-circle-outline"
+                  color={themeColors.blue}
+                  loading={false}
+                  onPress={handleExportBackup}
+                />
+                <ActionButton
+                  label="Import Backup"
+                  icon="arrow-up-circle-outline"
+                  color={themeColors.teal}
+                  loading={false}
+                  onPress={handleImportBackup}
+                />
+              </View>
+            </GlassCard>
+          </View>
+        )}
 
         {/* Steam config */}
         <View style={styles.section}>
-          <SectionHeader title="Steam Account" icon="logo-steam" iconColor={COLORS.blue} />
+          <SectionHeader title="Steam Account" icon="logo-steam" iconColor={themeColors.blue} />
           <GlassCard padding={16}>
             <FieldLabel
               label="SteamID or Profile URL"
@@ -140,7 +245,7 @@ export default function SettingsScreen() {
               secureTextEntry
             />
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: themeColors.accent }]} onPress={handleSave} activeOpacity={0.8}>
               <Ionicons name="checkmark" size={16} color="#fff" />
               <Text style={styles.saveBtnText}>Save Settings</Text>
             </TouchableOpacity>
@@ -149,22 +254,22 @@ export default function SettingsScreen() {
 
         {/* Import */}
         <View style={styles.section}>
-          <SectionHeader title="Library Import" icon="cloud-download" iconColor={COLORS.teal} />
+          <SectionHeader title="Library Import" icon="cloud-download" iconColor={themeColors.teal} />
           <GlassCard padding={16}>
             <Text style={styles.helpText}>
               Fetch your Steam game library using the Steam Web API. Your profile and
               game details must be set to{' '}
-              <Text style={{ color: COLORS.green }}>Public</Text>.
+              <Text style={{ color: themeColors.green }}>Public</Text>.
             </Text>
 
             {/* Progress bar */}
             {(importing || enriching) && progress && (
               <View style={styles.progressWrap}>
-                <View style={styles.progressTrack}>
+                <View style={[styles.progressTrack, { backgroundColor: themeColors.glassBorder }]}>
                   <View
                     style={[
                       styles.progressFill,
-                      { width: `${progressPct}%` as any },
+                      { width: `${progressPct}%` as any, backgroundColor: themeColors.teal },
                     ]}
                   />
                 </View>
@@ -179,19 +284,19 @@ export default function SettingsScreen() {
                 style={[
                   styles.resultChip,
                   importResult.startsWith('Error')
-                    ? { borderColor: COLORS.red + '55', backgroundColor: COLORS.red + '11' }
-                    : { borderColor: COLORS.green + '55', backgroundColor: COLORS.green + '11' },
+                    ? { borderColor: themeColors.red + '55', backgroundColor: themeColors.red + '11' }
+                    : { borderColor: themeColors.green + '55', backgroundColor: themeColors.green + '11' },
                 ]}
               >
                 <Ionicons
                   name={importResult.startsWith('Error') ? 'close-circle' : 'checkmark-circle'}
                   size={14}
-                  color={importResult.startsWith('Error') ? COLORS.red : COLORS.green}
+                  color={importResult.startsWith('Error') ? themeColors.red : themeColors.green}
                 />
                 <Text
                   style={[
                     styles.resultText,
-                    { color: importResult.startsWith('Error') ? COLORS.red : COLORS.green },
+                    { color: importResult.startsWith('Error') ? themeColors.red : themeColors.green },
                   ]}
                 >
                   {importResult}
@@ -202,7 +307,7 @@ export default function SettingsScreen() {
             <ActionButton
               label="Import Steam Library"
               icon="download-outline"
-              color={COLORS.teal}
+              color={themeColors.teal}
               loading={importing}
               onPress={handleImport}
             />
@@ -214,7 +319,7 @@ export default function SettingsScreen() {
           <SectionHeader
             title="HowLongToBeat"
             icon="time"
-            iconColor={COLORS.violet}
+            iconColor={themeColors.violet}
           />
           <GlassCard padding={16}>
             <Text style={styles.helpText}>
@@ -224,24 +329,24 @@ export default function SettingsScreen() {
 
             {enriching && hltbProgress && (
               <View style={styles.progressWrap}>
-                <View style={styles.progressTrack}>
+                <View style={[styles.progressTrack, { backgroundColor: themeColors.glassBorder }]}>
                   <View
                     style={[
                       styles.progressFill,
                       {
                         width: `${Math.round((hltbProgress.done / hltbProgress.total) * 100)}%` as any,
-                        backgroundColor: COLORS.violet,
+                        backgroundColor: themeColors.violet,
                       },
                     ]}
                   />
                 </View>
-                <Text style={styles.progressTitle} numberOfLines={1}>
+                <Text style={[styles.progressTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
                   {hltbProgress.currentTitle}
                 </Text>
-                <Text style={styles.progressLabel}>
+                <Text style={[styles.progressLabel, { color: themeColors.textMuted }]}>
                   {hltbProgress.done} / {hltbProgress.total} processed · {hltbProgress.total - hltbProgress.done} remaining
                 </Text>
-                <Text style={styles.progressLabel}>
+                <Text style={[styles.progressLabel, { color: themeColors.textMuted }]}>
                   {hltbProgress.enriched} successful · {hltbProgress.notFound} not found · {hltbProgress.failed} errors
                 </Text>
               </View>
@@ -250,7 +355,7 @@ export default function SettingsScreen() {
             <ActionButton
               label="Sync HLTB Data"
               icon="sync-outline"
-              color={COLORS.violet}
+              color={themeColors.violet}
               loading={enriching}
               onPress={handleEnrichHLTB}
             />
@@ -259,9 +364,11 @@ export default function SettingsScreen() {
 
         {/* About */}
         <View style={styles.section}>
-          <SectionHeader title="About" icon="information-circle" iconColor={COLORS.accent} />
+          <SectionHeader title="About" icon="information-circle" iconColor={themeColors.accent} />
+
           <GlassCard padding={16}>
             <InfoRow label="Version" value="1.0.0" />
+            <InfoRow label="Developer" value="MILS" />
             <InfoRow label="Built with" value="React Native + Expo" />
             <InfoRow label="Storage" value="Offline-first SQLite" />
           </GlassCard>
@@ -275,16 +382,17 @@ export default function SettingsScreen() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function FieldLabel({ label, hint, hintLink }: { label: string; hint?: string; hintLink?: string }) {
+function FieldLabel({ label, hint, hintLink }: { label: string; hint?: string; hintLink?: string; }) {
+  const { themeColors } = useAppContext();
   return (
     <View style={{ marginBottom: 6 }}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={[styles.fieldLabel, { color: themeColors.textSecondary }]}>{label}</Text>
       {hint && (
         <TouchableOpacity
           disabled={!hintLink}
           onPress={() => hintLink && Linking.openURL(hintLink)}
         >
-          <Text style={[styles.fieldHint, hintLink ? { color: COLORS.accent } : undefined]}>{hint}</Text>
+          <Text style={[styles.fieldHint, { color: themeColors.textMuted }, hintLink ? { color: themeColors.accent } : undefined]}>{hint}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -292,11 +400,12 @@ function FieldLabel({ label, hint, hintLink }: { label: string; hint?: string; h
 }
 
 function InputField(props: React.ComponentProps<typeof TextInput>) {
+  const { themeColors } = useAppContext();
   return (
-    <View style={styles.inputWrap}>
+    <View style={[styles.inputWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
       <TextInput
-        style={styles.input}
-        placeholderTextColor={COLORS.textMuted}
+        style={[styles.input, { color: themeColors.textPrimary }]}
+        placeholderTextColor={themeColors.textMuted}
         {...props}
       />
     </View>
@@ -334,48 +443,45 @@ function ActionButton({
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
+  const { themeColors } = useAppContext();
   return (
     <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
+      <Text style={[styles.infoLabel, { color: themeColors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: themeColors.textPrimary }]}>{value}</Text>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.bg },
+  root: { flex: 1 },
   scroll: { paddingTop: 60, paddingHorizontal: 20 },
   header: { marginBottom: 24 },
   title: {
-    color: COLORS.textPrimary,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.8,
   },
-  subtitle: { color: COLORS.textMuted, fontSize: 13, marginTop: 2 },
+  subtitle: { fontSize: 13, marginTop: 2 },
   section: { marginBottom: 24 },
   fieldLabel: {
-    color: COLORS.textSecondary,
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 2,
   },
-  fieldHint: { color: COLORS.textMuted, fontSize: 11 },
+  fieldHint: { fontSize: 11 },
   inputWrap: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glass,
     paddingHorizontal: 12,
     height: 44,
     justifyContent: 'center',
   },
-  input: { color: COLORS.textPrimary, fontSize: 14 },
+  input: { fontSize: 14 },
   saveBtn: {
     marginTop: 16,
     height: 46,
     borderRadius: 14,
-    backgroundColor: COLORS.accent,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -383,29 +489,26 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   helpText: {
-    color: COLORS.textSecondary,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 14,
+    color: '#88a'
   },
   progressWrap: { marginBottom: 12, gap: 4 },
   progressTrack: {
     height: 6,
-    backgroundColor: COLORS.glassMedium,
     borderRadius: 99,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 99,
-    backgroundColor: COLORS.teal,
   },
   progressTitle: {
-    color: COLORS.textPrimary,
     fontSize: 12,
     fontWeight: '600',
   },
-  progressLabel: { color: COLORS.textMuted, fontSize: 11, textAlign: 'right' },
+  progressLabel: { fontSize: 11, textAlign: 'right' },
   resultChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,8 +534,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.glassBorder,
   },
-  infoLabel: { color: COLORS.textSecondary, fontSize: 13 },
-  infoValue: { color: COLORS.textMuted, fontSize: 13 },
+  infoLabel: { fontSize: 13 },
+  infoValue: { fontSize: 13 },
+  premiumHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  premiumTitle: { fontSize: 20, fontWeight: '800' },
+  premiumDesc: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
+  unlockBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  unlockBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  themeItem: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1 },
+  themeLabel: { fontSize: 12, fontWeight: '700' },
 });

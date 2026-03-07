@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { COLORS } from '../utils/colors';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -20,13 +20,16 @@ export function GlassCard({
   tint = 'dark',
   padding = 16,
   radius = 20,
-  borderColor = COLORS.glassBorder,
+  borderColor,
 }: GlassCardProps) {
+  const { themeColors } = useAppContext();
+  const finalBorderColor = borderColor || themeColors.glassBorder;
+
   return (
     <View
       style={[
         styles.wrapper,
-        { borderRadius: radius, borderColor },
+        { borderRadius: radius, borderColor: finalBorderColor },
         style,
       ]}
     >
@@ -38,7 +41,7 @@ export function GlassCard({
       <View
         style={[
           StyleSheet.absoluteFill,
-          { borderRadius: radius, backgroundColor: COLORS.glass },
+          { borderRadius: radius, backgroundColor: themeColors.glass },
         ]}
       />
       <View style={{ padding, borderRadius: radius, overflow: 'hidden' }}>

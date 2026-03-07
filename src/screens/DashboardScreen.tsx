@@ -15,24 +15,34 @@ import { useFocusEffect } from 'expo-router';
 import { useGames } from '../../src/hooks/useGames';
 import { useRecommendation } from '../../src/hooks/useRecommendation';
 import { GameCard } from '../../src/components/GameCard';
+import { GameCover } from '../../src/components/GameCover';
 import { StatCard } from '../../src/components/StatCard';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { PickNextGameModal } from '../../src/components/PickNextGameModal';
-import { COLORS } from '../../src/utils/colors';
+import { GlassCard } from '../../src/components/GlassCard';
 import { formatBacklogHours } from '../../src/utils/formatters';
+import { useAppContext } from '../../src/hooks/useAppContext';
+import { getTopRecommendations } from '../../src/services/recommendationService';
+import { useRouter } from 'expo-router';
 
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const { games, stats, refresh, setStatus, getByStatus } = useGames();
   const { recommendation, refresh: refreshRec, reroll } = useRecommendation();
+  const { themeColors, isPremium } = useAppContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [topRecs, setTopRecs] = useState<any[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       refresh();
       refreshRec();
-    }, [refresh, refreshRec])
+      if (isPremium) {
+        setTopRecs(getTopRecommendations());
+      }
+    }, [refresh, refreshRec, isPremium])
   );
 
   const onRefresh = async () => {
@@ -46,12 +56,12 @@ export default function DashboardScreen() {
   const paused = getByStatus('paused');
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Hero gradient background */}
       <LinearGradient
-        colors={['#1a0a3a', '#0a0a14']}
+        colors={[themeColors.bg, themeColors.card]}
         style={StyleSheet.absoluteFill}
         start={{ x: 0.3, y: 0 }}
         end={{ x: 0.7, y: 0.5 }}
@@ -63,7 +73,7 @@ export default function DashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={COLORS.accent}
+            tintColor={themeColors.accent}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -71,46 +81,87 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Steam Backlog</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.greeting, { color: themeColors.textPrimary }]}>Steam Backlog</Text>
+            <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
               {stats
                 ? `${stats.total} games · ${formatBacklogHours(stats.total_hours_remaining)} remaining`
                 : 'Loading your library…'}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.pickBtn}
-            onPress={() => setModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[COLORS.accent, COLORS.accentAlt]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={StyleSheet.absoluteFill}
-            />
-            <Ionicons name="dice" size={18} color="#fff" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity
+              style={styles.pickBtn}
+              onPress={() => router.push('/share' as any)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[themeColors.teal, themeColors.blue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Ionicons name="share-social" size={18} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.pickBtn}
+              onPress={() => setModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[themeColors.accent, themeColors.violet]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <Ionicons name="dice" size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Backlog countdown banner */}
         {stats && stats.total_hours_remaining > 0 && (
-          <View style={styles.banner}>
+          <View style={[styles.banner, { borderColor: themeColors.glassBorder }]}>
             <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
             <LinearGradient
-              colors={[COLORS.accent + '22', COLORS.cyan + '10']}
+              colors={[themeColors.accent + '22', themeColors.orange + '10']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            <Ionicons name="hourglass-outline" size={20} color={COLORS.cyan} />
-            <Text style={styles.bannerText}>
+            <Ionicons name="hourglass-outline" size={20} color={themeColors.orange} />
+            <Text style={[styles.bannerText, { color: themeColors.textSecondary }]}>
               Your backlog will take{' '}
-              <Text style={{ color: COLORS.cyan, fontWeight: '800' }}>
+              <Text style={{ color: themeColors.orange, fontWeight: '800' }}>
                 {formatBacklogHours(stats.total_hours_remaining)}
               </Text>{' '}
               to finish
             </Text>
+          </View>
+        )}
+
+        {/* --- Premium Widget Top Row --- */}
+        {isPremium && topRecs.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="AI Recommended Next" icon="sparkles" iconColor={themeColors.orange} />
+            <TouchableOpacity onPress={() => router.push(`/game/${topRecs[0].game.id}`)} activeOpacity={0.8} style={{ position: 'relative', marginTop: 12 }}>
+              <View style={[styles.premiumBadgeRow, { backgroundColor: themeColors.accent, zIndex: 10 }]}>
+                <Text style={styles.premiumBadgeText}>Match {topRecs[0].score}%</Text>
+              </View>
+              <GlassCard padding={16} radius={16} borderColor={themeColors.accent} intensity={30}>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <GameCover uri={topRecs[0].game.cover_url} width={80} height={110} radius={12} />
+                  <View style={{ flex: 1, justifyContent: 'center' }}>
+                    <Text style={[styles.recTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
+                      {topRecs[0].game.title}
+                    </Text>
+                    <Text style={[styles.recReason, { color: themeColors.textSecondary }]}>
+                      {topRecs[0].reason}
+                    </Text>
+                  </View>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -122,13 +173,13 @@ export default function DashboardScreen() {
                 label="Total Games"
                 value={stats.total}
                 icon="library"
-                color={COLORS.accent}
+                color={themeColors.accent}
               />
               <StatCard
                 label="Playing"
                 value={stats.playing}
                 icon="play-circle"
-                color={COLORS.green}
+                color={themeColors.green}
               />
             </View>
             <View style={styles.statsRow}>
@@ -136,13 +187,13 @@ export default function DashboardScreen() {
                 label="Up Next"
                 value={stats.up_next}
                 icon="bookmark"
-                color={COLORS.blue}
+                color={themeColors.blue}
               />
               <StatCard
                 label="HLTB Met"
                 value={stats.hltb_target_met}
                 icon="checkmark-done-circle"
-                color={COLORS.cyan}
+                color={themeColors.orange}
                 subtitle={`${stats.completed} completed`}
               />
             </View>
@@ -155,7 +206,7 @@ export default function DashboardScreen() {
             <SectionHeader
               title="Currently Playing"
               icon="play-circle"
-              iconColor={COLORS.green}
+              iconColor={themeColors.green}
               count={playing.length}
             />
             {playing.map((g) => (
@@ -174,11 +225,11 @@ export default function DashboardScreen() {
             <SectionHeader
               title="Up Next"
               icon="bookmark"
-              iconColor={COLORS.blue}
+              iconColor={themeColors.blue}
               count={upNext.length}
               action={{
                 label: 'See all',
-                onPress: () => {},
+                onPress: () => { },
               }}
             />
             {upNext.slice(0, 5).map((g) => (
@@ -197,7 +248,7 @@ export default function DashboardScreen() {
             <SectionHeader
               title="Paused"
               icon="pause-circle"
-              iconColor={COLORS.yellow}
+              iconColor={themeColors.violet}
               count={paused.length}
             />
             {paused.slice(0, 3).map((g) => (
@@ -209,9 +260,9 @@ export default function DashboardScreen() {
         {/* Empty state */}
         {games.length === 0 && (
           <View style={styles.empty}>
-            <Ionicons name="cloud-download-outline" size={56} color={COLORS.textMuted} />
-            <Text style={styles.emptyTitle}>No games yet</Text>
-            <Text style={styles.emptyText}>
+            <Ionicons name="cloud-download-outline" size={56} color={themeColors.textMuted} />
+            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>No games yet</Text>
+            <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>
               Go to Settings and import your Steam library to get started.
             </Text>
           </View>
@@ -233,7 +284,6 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.bg,
   },
   scroll: {
     paddingTop: 60,
@@ -246,13 +296,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greeting: {
-    color: COLORS.textPrimary,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: COLORS.textMuted,
     fontSize: 13,
     marginTop: 3,
   },
@@ -267,7 +315,6 @@ const styles = StyleSheet.create({
   banner: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
@@ -276,7 +323,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   bannerText: {
-    color: COLORS.textSecondary,
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
@@ -298,15 +344,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyTitle: {
-    color: COLORS.textPrimary,
     fontSize: 20,
     fontWeight: '700',
   },
   emptyText: {
-    color: COLORS.textMuted,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 20,
   },
+  premiumBadgeRow: {
+    position: 'absolute',
+    top: -10,
+    right: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 10,
+    elevation: 5,
+  },
+  premiumBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  recTitle: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  recReason: { fontSize: 12, lineHeight: 18 },
 });

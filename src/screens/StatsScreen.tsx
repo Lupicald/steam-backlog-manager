@@ -13,12 +13,13 @@ import { useGames } from '../../src/hooks/useGames';
 import { StatCard } from '../../src/components/StatCard';
 import { GlassCard } from '../../src/components/GlassCard';
 import { SectionHeader } from '../../src/components/SectionHeader';
-import { COLORS } from '../../src/utils/colors';
 import { formatBacklogHours } from '../../src/utils/formatters';
+import { useAppContext } from '../../src/hooks/useAppContext';
 
 const DAILY_PLAY_SCENARIOS = [1, 2, 3];
 
 export default function StatsScreen() {
+  const { themeColors, isPremium } = useAppContext();
   const { stats, refresh } = useGames();
 
   useFocusEffect(
@@ -39,27 +40,27 @@ export default function StatsScreen() {
 
   const statusBreakdown = stats
     ? [
-        { label: 'Playing', value: stats.playing, color: COLORS.green },
-        { label: 'Up Next', value: stats.up_next, color: COLORS.blue },
-        { label: 'Paused', value: stats.paused, color: COLORS.yellow },
-        { label: 'Completed', value: stats.completed, color: COLORS.purple },
-        { label: 'Abandoned', value: stats.abandoned, color: COLORS.red },
-        { label: 'Not Started', value: stats.not_started, color: COLORS.textMuted },
-      ]
+      { label: 'Playing', value: stats.playing, color: themeColors.green },
+      { label: 'Up Next', value: stats.up_next, color: themeColors.blue },
+      { label: 'Paused', value: stats.paused, color: themeColors.violet },
+      { label: 'Completed', value: stats.completed, color: themeColors.accent },
+      { label: 'Abandoned', value: stats.abandoned, color: themeColors.red },
+      { label: 'Not Started', value: stats.not_started, color: themeColors.textMuted },
+    ]
     : [];
 
   const realisticBacklog = stats
     ? DAILY_PLAY_SCENARIOS.map((hoursPerDay) => ({
-        hoursPerDay,
-        label: formatBacklogDuration(stats.total_hours_remaining, hoursPerDay),
-      }))
+      hoursPerDay,
+      label: formatBacklogDuration(stats.total_hours_remaining, hoursPerDay),
+    }))
     : [];
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#0a001a', '#0a0a14']}
+        colors={[themeColors.bg, themeColors.card]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -68,8 +69,8 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Statistics</Text>
-          <Text style={styles.subtitle}>Your backlog at a glance</Text>
+          <Text style={[styles.title, { color: themeColors.textPrimary }]}>Statistics</Text>
+          <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>Your backlog at a glance</Text>
         </View>
 
         {/* Big stats */}
@@ -78,27 +79,27 @@ export default function StatsScreen() {
             {/* Backlog countdown */}
             <GlassCard style={styles.countdown} padding={20}>
               <LinearGradient
-                colors={[COLORS.accent + '25', COLORS.cyan + '10']}
+                colors={[themeColors.accent + '25', themeColors.orange + '10']}
                 style={StyleSheet.absoluteFill}
               />
-              <Ionicons name="hourglass" size={28} color={COLORS.cyan} />
-              <Text style={styles.countdownHours}>
+              <Ionicons name="hourglass" size={28} color={themeColors.orange} />
+              <Text style={[styles.countdownHours, { color: themeColors.textPrimary }]}>
                 {formatBacklogHours(stats.total_hours_remaining)}
               </Text>
-              <Text style={styles.countdownLabel}>estimated to finish your backlog</Text>
+              <Text style={[styles.countdownLabel, { color: themeColors.textSecondary }]}>estimated to finish your backlog</Text>
             </GlassCard>
 
             <View style={styles.section}>
               <SectionHeader
                 title="Realistic Pace"
                 icon="calendar"
-                iconColor={COLORS.cyan}
+                iconColor={themeColors.orange}
               />
               <GlassCard padding={16}>
                 {realisticBacklog.map((item) => (
-                  <View key={item.hoursPerDay} style={styles.realisticRow}>
-                    <Text style={styles.realisticLabel}>At {item.hoursPerDay}h/day</Text>
-                    <Text style={styles.realisticValue}>{item.label}</Text>
+                  <View key={item.hoursPerDay} style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
+                    <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>At {item.hoursPerDay}h/day</Text>
+                    <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{item.label}</Text>
                   </View>
                 ))}
               </GlassCard>
@@ -110,13 +111,13 @@ export default function StatsScreen() {
                 label="Total Games"
                 value={stats.total}
                 icon="library"
-                color={COLORS.accent}
+                color={themeColors.accent}
               />
               <StatCard
                 label="Playtime"
                 value={`${stats.total_playtime_hours}h`}
                 icon="game-controller"
-                color={COLORS.teal}
+                color={themeColors.teal}
               />
             </View>
             <View style={[styles.row, { marginTop: 10 }]}>
@@ -124,14 +125,14 @@ export default function StatsScreen() {
                 label="Completed"
                 value={`${completionRate}%`}
                 icon="checkmark-circle"
-                color={COLORS.purple}
+                color={themeColors.violet}
                 subtitle={`${stats.completed} of ${stats.total}`}
               />
               <StatCard
                 label="Backlog"
                 value={`${backlogRate}%`}
                 icon="archive"
-                color={COLORS.rose}
+                color={themeColors.red}
                 subtitle={`${stats.total - stats.completed} remaining`}
               />
             </View>
@@ -140,20 +141,20 @@ export default function StatsScreen() {
               <SectionHeader
                 title="HLTB Progress"
                 icon="checkmark-done-circle"
-                iconColor={COLORS.green}
+                iconColor={themeColors.green}
               />
               <GlassCard padding={16}>
-                <View style={styles.realisticRow}>
-                  <Text style={styles.realisticLabel}>HLTB target met</Text>
-                  <Text style={styles.realisticValue}>{stats.hltb_target_met} games</Text>
+                <View style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
+                  <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>HLTB target met</Text>
+                  <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{stats.hltb_target_met} games</Text>
                 </View>
-                <View style={styles.realisticRow}>
-                  <Text style={styles.realisticLabel}>Ready to finish now</Text>
-                  <Text style={styles.realisticValue}>{stats.hltb_ready_to_finish} games</Text>
+                <View style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
+                  <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>Ready to finish now</Text>
+                  <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{stats.hltb_ready_to_finish} games</Text>
                 </View>
-                <View style={styles.realisticRow}>
-                  <Text style={styles.realisticLabel}>Excluded from calculator</Text>
-                  <Text style={styles.realisticValue}>{stats.excluded_from_backlog} games</Text>
+                <View style={[styles.realisticRow, { borderBottomColor: themeColors.glassBorder }]}>
+                  <Text style={[styles.realisticLabel, { color: themeColors.textSecondary }]}>Excluded from calculator</Text>
+                  <Text style={[styles.realisticValue, { color: themeColors.textPrimary }]}>{stats.excluded_from_backlog} games</Text>
                 </View>
               </GlassCard>
             </View>
@@ -163,14 +164,14 @@ export default function StatsScreen() {
               <SectionHeader
                 title="By Status"
                 icon="pie-chart"
-                iconColor={COLORS.accent}
+                iconColor={themeColors.accent}
               />
               <GlassCard padding={16}>
                 {statusBreakdown.map((item) => (
                   <View key={item.label} style={styles.breakdownRow}>
                     <View style={[styles.dot, { backgroundColor: item.color }]} />
-                    <Text style={styles.breakdownLabel}>{item.label}</Text>
-                    <View style={styles.breakdownBarWrap}>
+                    <Text style={[styles.breakdownLabel, { color: themeColors.textSecondary }]}>{item.label}</Text>
+                    <View style={[styles.breakdownBarWrap, { backgroundColor: themeColors.glassBorder }]}>
                       <View
                         style={[
                           styles.breakdownBar,
@@ -195,9 +196,9 @@ export default function StatsScreen() {
 
         {!stats && (
           <View style={styles.empty}>
-            <Ionicons name="bar-chart-outline" size={48} color={COLORS.textMuted} />
-            <Text style={styles.emptyText}>No data yet</Text>
-            <Text style={styles.emptySubText}>
+            <Ionicons name="bar-chart-outline" size={48} color={themeColors.textMuted} />
+            <Text style={[styles.emptyText, { color: themeColors.textSecondary }]}>No data yet</Text>
+            <Text style={[styles.emptySubText, { color: themeColors.textMuted }]}>
               Import your Steam library to see statistics.
             </Text>
           </View>
@@ -232,16 +233,15 @@ function formatBacklogDuration(totalHours: number, hoursPerDay: number): string 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.bg },
+  root: { flex: 1 },
   scroll: { paddingTop: 60, paddingHorizontal: 20 },
   header: { marginBottom: 24 },
   title: {
-    color: COLORS.textPrimary,
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.8,
   },
-  subtitle: { color: COLORS.textMuted, fontSize: 13, marginTop: 2 },
+  subtitle: { fontSize: 13, marginTop: 2 },
   countdown: {
     alignItems: 'center',
     marginBottom: 20,
@@ -249,14 +249,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   countdownHours: {
-    color: COLORS.textPrimary,
     fontSize: 40,
     fontWeight: '900',
     letterSpacing: -1,
     textAlign: 'center',
   },
   countdownLabel: {
-    color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -268,14 +266,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.glassBorder,
   },
   realisticLabel: {
-    color: COLORS.textSecondary,
     fontSize: 14,
   },
   realisticValue: {
-    color: COLORS.textPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -287,14 +282,12 @@ const styles = StyleSheet.create({
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
   breakdownLabel: {
-    color: COLORS.textSecondary,
     fontSize: 13,
     width: 90,
   },
   breakdownBarWrap: {
     flex: 1,
     height: 6,
-    backgroundColor: COLORS.glassMedium,
     borderRadius: 99,
     overflow: 'hidden',
   },
@@ -311,9 +304,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  emptyText: { color: COLORS.textSecondary, fontSize: 16, fontWeight: '600' },
+  emptyText: { fontSize: 16, fontWeight: '600' },
   emptySubText: {
-    color: COLORS.textMuted,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,

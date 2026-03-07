@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../utils/colors';
+import { useAppContext } from '../hooks/useAppContext';
 
 interface GameCoverProps {
   uri: string;
@@ -27,14 +27,15 @@ export function GameCover({
 }: GameCoverProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const { themeColors } = useAppContext();
 
   return (
     <View
-      style={[styles.wrapper, { width, height, borderRadius: radius }, style]}
+      style={[styles.wrapper, { width, height, borderRadius: radius, backgroundColor: themeColors.card }, style]}
     >
       {error ? (
-        <View style={[styles.placeholder, { borderRadius: radius }]}>
-          <Ionicons name="game-controller" size={28} color={COLORS.textMuted} />
+        <View style={[styles.placeholder, { borderRadius: radius, backgroundColor: themeColors.card }]}>
+          <Ionicons name="game-controller" size={28} color={themeColors.textMuted} />
         </View>
       ) : (
         <>
@@ -49,8 +50,8 @@ export function GameCover({
             resizeMode="cover"
           />
           {loading && (
-            <View style={[StyleSheet.absoluteFill, styles.loader, { borderRadius: radius }]}>
-              <ActivityIndicator color={COLORS.accent} size="small" />
+            <View style={[StyleSheet.absoluteFill, styles.loader, { borderRadius: radius, backgroundColor: themeColors.card }]}>
+              <ActivityIndicator color={themeColors.accent} size="small" />
             </View>
           )}
         </>
@@ -62,7 +63,6 @@ export function GameCover({
 const styles = StyleSheet.create({
   wrapper: {
     overflow: 'hidden',
-    backgroundColor: COLORS.bgTertiary,
   },
   image: {
     width: '100%',
@@ -72,12 +72,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.bgTertiary,
   },
   loader: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.bgTertiary,
   },
 });

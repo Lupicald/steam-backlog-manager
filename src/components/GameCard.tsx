@@ -21,7 +21,8 @@ import {
   getRemainingMinutes,
   truncate,
 } from '../utils/formatters';
-import { COLORS } from '../utils/colors';
+import { useAppContext } from '../hooks/useAppContext';
+import { ThemeColors } from '../services/themeService';
 
 interface GameCardProps {
   game: Game;
@@ -39,6 +40,8 @@ const STATUS_CYCLE: GameStatus[] = [
 ];
 
 export function GameCard({ game, onStatusChange, compact = false }: GameCardProps) {
+  const { themeColors } = useAppContext();
+  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const router = useRouter();
   const statusConfig = STATUS_CONFIG[game.status];
 
@@ -57,7 +60,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
     return (
       <TouchableOpacity onPress={openDetail} activeOpacity={0.8} style={styles.compactWrapper}>
         <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.glass }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: themeColors.glass }]} />
         <GameCover uri={game.cover_url} width={90} height={50} radius={10} />
         <View style={styles.compactInfo}>
           <Text style={styles.compactTitle} numberOfLines={1}>
@@ -65,7 +68,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
           </Text>
           <StatusBadge status={game.status} size="sm" />
         </View>
-        <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+        <Ionicons name="chevron-forward" size={16} color={themeColors.textMuted} />
       </TouchableOpacity>
     );
   }
@@ -80,7 +83,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.glass }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: themeColors.glass }]} />
 
       {/* Content row */}
       <View style={styles.row}>
@@ -101,7 +104,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
           <View style={styles.meta}>
             {game.hltb_main_story ? (
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={11} color={COLORS.textMuted} />
+                <Ionicons name="time-outline" size={11} color={themeColors.textMuted} />
                 <Text style={styles.metaText}>
                   {formatHLTBTime(game.hltb_main_story)}
                 </Text>
@@ -109,7 +112,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
             ) : null}
             {game.playtime_minutes > 0 ? (
               <View style={styles.metaItem}>
-                <Ionicons name="game-controller-outline" size={11} color={COLORS.textMuted} />
+                <Ionicons name="game-controller-outline" size={11} color={themeColors.textMuted} />
                 <Text style={styles.metaText}>
                   {formatMinutes(game.playtime_minutes)} played
                 </Text>
@@ -117,7 +120,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
             ) : null}
             {remainingMinutes !== null ? (
               <View style={styles.metaItem}>
-                <Ionicons name="hourglass-outline" size={11} color={COLORS.cyan} />
+                <Ionicons name="hourglass-outline" size={11} color={themeColors.teal} />
                 <Text style={[styles.metaText, styles.remainingText]}>
                   {formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} left
                 </Text>
@@ -159,11 +162,11 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (themeColors: ThemeColors) => StyleSheet.create({
   wrapper: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: themeColors.glassBorder,
     overflow: 'hidden',
     marginBottom: 12,
   },
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   title: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: -0.2,
@@ -201,11 +204,11 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   metaText: {
-    color: COLORS.textMuted,
+    color: themeColors.textMuted,
     fontSize: 11,
   },
   remainingText: {
-    color: COLORS.cyan,
+    color: themeColors.teal,
   },
   statusBtn: {
     width: 42,
@@ -223,7 +226,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 3,
-    backgroundColor: COLORS.glassMedium,
+    backgroundColor: themeColors.glassBorder,
     marginHorizontal: 12,
     marginBottom: 10,
     borderRadius: 99,
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
   compactWrapper: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: themeColors.glassBorder,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
@@ -251,7 +254,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   compactTitle: {
-    color: COLORS.textPrimary,
+    color: themeColors.textPrimary,
     fontSize: 13,
     fontWeight: '600',
   },

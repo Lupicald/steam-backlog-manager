@@ -2,9 +2,10 @@ import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { StyleSheet, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../src/utils/colors';
+import { useAppContext } from '../../src/hooks/useAppContext';
 
 function TabBarBackground() {
+  const { themeColors } = useAppContext();
   return (
     <BlurView
       intensity={50}
@@ -14,7 +15,7 @@ function TabBarBackground() {
       <View
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: 'rgba(10,10,20,0.7)', borderTopWidth: 1, borderColor: COLORS.glassBorder },
+          { backgroundColor: `${themeColors.bg}CC`, borderTopWidth: 1, borderColor: themeColors.glassBorder },
         ]}
       />
     </BlurView>
@@ -22,12 +23,13 @@ function TabBarBackground() {
 }
 
 export default function TabLayout() {
+  const { themeColors } = useAppContext();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.accent,
-        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarActiveTintColor: themeColors.accent,
+        tabBarInactiveTintColor: themeColors.textMuted,
         tabBarStyle: {
           position: 'absolute',
           borderTopWidth: 0,
@@ -38,7 +40,7 @@ export default function TabLayout() {
         },
         tabBarBackground: () => <TabBarBackground />,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
           marginTop: 2,
         },
@@ -59,6 +61,24 @@ export default function TabLayout() {
           title: 'Library',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="library" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="recommendations"
+        options={{
+          title: 'AI Picker',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="sparkles" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="planner"
+        options={{
+          title: 'Planner',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar" size={size} color={color} />
           ),
         }}
       />
