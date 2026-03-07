@@ -1,8 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Recommendation } from '../types';
-import { getTopRecommendations } from '../services/recommendationService';
-
-
+import { getRecommendations, rememberRecommendationShown } from '../services/recommendationService';
 
 export function useRecommendation(): {
   recommendation: Recommendation | null;
@@ -12,16 +10,36 @@ export function useRecommendation(): {
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
 
   const refresh = useCallback(() => {
-    const results = getTopRecommendations();
+    const results = getRecommendations({ limit: 1 });
+    if (results[0]) {
+      rememberRecommendationShown(results[0].game.id);
+    }
     setRecommendation(results[0] ?? null);
   }, []);
 
   const reroll = useCallback((hours?: number) => {
-    const results = getTopRecommendations(hours);
     setRecommendation((current) => {
-      // Try to avoid re-selecting the same game if there are more options
-      const filtered = results.filter(r => r.game.id !== current?.game.id);
-      return filtered[0] ?? results[0] ?? null;
+      const results = getRecommendations({
+        availableTimeHours: hours,
+        limit: 3,
+        excludeGameIds: current ? [current.game.id] : [],
+      });
+
+      if (results.length > 0) {
+        rememberRecommendationShown(results[0].game.id);
+        return results[0];
+      }
+
+      const fallback = getRecommendations({
+        availableTimeHours: hours,
+        limit: 1,
+      });
+
+      if (fallback[0]) {
+        rememberRecommendationShown(fallback[0].game.id);
+      }
+
+      return fallback[0] ?? null;
     });
   }, []);
 

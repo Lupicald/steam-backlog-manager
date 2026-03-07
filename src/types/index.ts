@@ -74,6 +74,69 @@ export interface Recommendation {
   game: Game;
   reason: string;
   score: number;
+  match: number;
+  highlights: string[];
+  whyNot?: string;
+  badges: string[];
+  sessionsToFinish: number | null;
+  daysWaiting: number;
+}
+
+export type RecommendationMood = 'balanced' | 'advance' | 'short' | 'chill' | 'resume' | 'finish';
+
+export type RecommendationGoal = 'none' | 'finish_today' | 'two_sessions' | 'bite_size';
+
+export interface TasteProfile {
+  title: string;
+  summary: string;
+  tags: string[];
+}
+
+export interface BacklogMission {
+  id: string;
+  title: string;
+  description: string;
+  gameId?: number;
+}
+
+export interface SmartCollection {
+  id: string;
+  title: string;
+  description: string;
+  games: Recommendation[];
+}
+
+export interface WeeklyPlanItem {
+  label: string;
+  note: string;
+  recommendation: Recommendation;
+}
+
+export interface WeeklyPlan {
+  title: string;
+  summary: string;
+  totalHours: number;
+  items: WeeklyPlanItem[];
+}
+
+export interface VersusPair {
+  prompt: string;
+  left: Recommendation;
+  right: Recommendation;
+}
+
+export interface DailyPick {
+  recommendation: Recommendation;
+  streak: number;
+  subtitle: string;
+}
+
+export interface CompletionCelebration {
+  gameId: number;
+  title: string;
+  savedHours: number;
+  completedCount: number;
+  dateKey: string;
 }
 
 export interface GamingSession {

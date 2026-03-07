@@ -9,6 +9,7 @@ import {
   getBacklogStats,
 } from '../database/queries';
 import { Game, GameStatus, GamePriority, BacklogStats } from '../types';
+import { recordCompletionCelebration } from '../services/recommendationService';
 
 export function useGames() {
   const [games, setGames] = useState<Game[]>([]);
@@ -36,7 +37,14 @@ export function useGames() {
 
   const setStatus = useCallback(
     (id: number, status: GameStatus) => {
+      const current = getGameById(id);
+      const previousStats = getBacklogStats();
       updateGame(id, { status });
+      const updated = getGameById(id);
+      const nextStats = getBacklogStats();
+      if (current && updated && current.status !== 'completed' && status === 'completed') {
+        recordCompletionCelebration(updated, previousStats.total_hours_remaining, nextStats.total_hours_remaining);
+      }
       refresh();
     },
     [refresh]

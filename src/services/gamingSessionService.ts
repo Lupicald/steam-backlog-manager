@@ -1,5 +1,6 @@
 import { logGamingSession, updateGame } from '../database/queries';
 import { Game } from '../types';
+import { markDailyPickPlayed } from './recommendationService';
 
 export function logSessionAndUpdateGame(game: Game, minutes: number, notes?: string): void {
     // 1. Log the session
@@ -15,4 +16,6 @@ export function logSessionAndUpdateGame(game: Game, minutes: number, notes?: str
         playtime_minutes: newTotal,
         last_played: now
     });
+
+    markDailyPickPlayed(game.id);
 }

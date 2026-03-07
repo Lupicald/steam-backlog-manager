@@ -22,8 +22,9 @@ import { PickNextGameModal } from '../../src/components/PickNextGameModal';
 import { GlassCard } from '../../src/components/GlassCard';
 import { formatBacklogHours } from '../../src/utils/formatters';
 import { useAppContext } from '../../src/hooks/useAppContext';
-import { getTopRecommendations } from '../../src/services/recommendationService';
+import { getDailyPick, getRecommendations, getRecentCompletionCelebration } from '../../src/services/recommendationService';
 import { useRouter } from 'expo-router';
+import { CompletionCelebration, DailyPick, Recommendation } from '../../src/types';
 
 
 export default function DashboardScreen() {
@@ -33,14 +34,18 @@ export default function DashboardScreen() {
   const { themeColors, isPremium } = useAppContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [topRecs, setTopRecs] = useState<any[]>([]);
+  const [topRecs, setTopRecs] = useState<Recommendation[]>([]);
+  const [dailyPick, setDailyPick] = useState<DailyPick | null>(null);
+  const [celebration, setCelebration] = useState<CompletionCelebration | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       refresh();
       refreshRec();
+      setDailyPick(getDailyPick());
+      setCelebration(getRecentCompletionCelebration());
       if (isPremium) {
-        setTopRecs(getTopRecommendations());
+        setTopRecs(getRecommendations({ limit: 3 }));
       }
     }, [refresh, refreshRec, isPremium])
   );
@@ -141,12 +146,58 @@ export default function DashboardScreen() {
         )}
 
         {/* --- Premium Widget Top Row --- */}
+        {dailyPick && (
+          <View style={styles.section}>
+            <SectionHeader title="Daily Pick" icon="flash" iconColor={themeColors.teal} />
+            <TouchableOpacity onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)} activeOpacity={0.82}>
+              <GlassCard padding={16} radius={18} borderColor={themeColors.teal} intensity={26} style={{ overflow: 'hidden' }}>
+                <LinearGradient
+                  colors={[themeColors.teal + '22', themeColors.blue + '12']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                  <GameCover uri={dailyPick.recommendation.game.cover_url} width={92} height={58} radius={12} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.recTitle, { color: themeColors.textPrimary }]} numberOfLines={1}>
+                      {dailyPick.recommendation.game.title}
+                    </Text>
+                    <Text style={[styles.recReason, { color: themeColors.textSecondary }]} numberOfLines={2}>
+                      {dailyPick.recommendation.reason}
+                    </Text>
+                    <Text style={[styles.dailyMeta, { color: themeColors.teal }]}>
+                      {dailyPick.subtitle}
+                    </Text>
+                  </View>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {celebration && (
+          <View style={styles.section}>
+            <SectionHeader title="Recent Win" icon="trophy" iconColor={themeColors.orange} />
+            <GlassCard padding={18} radius={18} style={{ overflow: 'hidden' }}>
+              <LinearGradient
+                colors={[themeColors.orange + '20', themeColors.accent + '12']}
+                style={StyleSheet.absoluteFill}
+              />
+              <Text style={[styles.celebrationTitle, { color: themeColors.textPrimary }]}>
+                {celebration.title} completed
+              </Text>
+              <Text style={[styles.celebrationText, { color: themeColors.textSecondary }]}>
+                You shaved {celebration.savedHours}h off the backlog and reached {celebration.completedCount} completed games.
+              </Text>
+            </GlassCard>
+          </View>
+        )}
+
         {isPremium && topRecs.length > 0 && (
           <View style={styles.section}>
             <SectionHeader title="AI Recommended Next" icon="sparkles" iconColor={themeColors.orange} />
             <TouchableOpacity onPress={() => router.push(`/game/${topRecs[0].game.id}`)} activeOpacity={0.8} style={{ position: 'relative', marginTop: 12 }}>
               <View style={[styles.premiumBadgeRow, { backgroundColor: themeColors.accent, zIndex: 10 }]}>
-                <Text style={styles.premiumBadgeText}>Match {topRecs[0].score}%</Text>
+                <Text style={styles.premiumBadgeText}>Match {topRecs[0].match}%</Text>
               </View>
               <GlassCard padding={16} radius={16} borderColor={themeColors.accent} intensity={30}>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -366,4 +417,7 @@ const styles = StyleSheet.create({
   premiumBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   recTitle: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
   recReason: { fontSize: 12, lineHeight: 18 },
+  dailyMeta: { fontSize: 12, fontWeight: '700', marginTop: 6 },
+  celebrationTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6 },
+  celebrationText: { fontSize: 13, lineHeight: 20 },
 });
