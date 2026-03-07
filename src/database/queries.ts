@@ -86,7 +86,7 @@ export function updateGameNotes(id: number, notes: string): void {
 
 export function updateGame(
   id: number,
-  fields: Partial<Pick<Game, 'status' | 'priority' | 'progress_percentage' | 'notes'>>
+  fields: Partial<Pick<Game, 'status' | 'priority' | 'progress_percentage' | 'notes' | 'exclude_from_backlog'>>
 ): void {
   const db = getDatabase();
   const entries = Object.entries(fields);
@@ -122,6 +122,9 @@ export function getBacklogStats(): BacklogStats {
     completed: number;
     abandoned: number;
     not_started: number;
+    excluded_from_backlog: number;
+    hltb_target_met: number;
+    hltb_ready_to_finish: number;
   }>(`
     SELECT
       COUNT(*) AS total,
@@ -130,11 +133,15 @@ export function getBacklogStats(): BacklogStats {
       SUM(CASE WHEN status = 'paused'      THEN 1 ELSE 0 END) AS paused,
       SUM(CASE WHEN status = 'completed'   THEN 1 ELSE 0 END) AS completed,
       SUM(CASE WHEN status = 'abandoned'   THEN 1 ELSE 0 END) AS abandoned,
-      SUM(CASE WHEN status = 'not_started' THEN 1 ELSE 0 END) AS not_started
+      SUM(CASE WHEN status = 'not_started' THEN 1 ELSE 0 END) AS not_started,
+      SUM(CASE WHEN exclude_from_backlog = 1 THEN 1 ELSE 0 END) AS excluded_from_backlog,
+      SUM(CASE WHEN hltb_main_story IS NOT NULL AND playtime_minutes * 60 >= hltb_main_story THEN 1 ELSE 0 END) AS hltb_target_met,
+      SUM(CASE WHEN hltb_main_story IS NOT NULL AND status NOT IN ('completed', 'abandoned') AND playtime_minutes * 60 >= hltb_main_story THEN 1 ELSE 0 END) AS hltb_ready_to_finish
     FROM games
   `) ?? {
     total: 0, playing: 0, up_next: 0, paused: 0,
-    completed: 0, abandoned: 0, not_started: 0,
+    completed: 0, abandoned: 0, not_started: 0, excluded_from_backlog: 0,
+    hltb_target_met: 0, hltb_ready_to_finish: 0,
   };
 
   // Estimate remaining hours using HLTB main story where available,
@@ -143,7 +150,7 @@ export function getBacklogStats(): BacklogStats {
     SELECT
       SUM(
         CASE
-          WHEN status NOT IN ('completed', 'abandoned') THEN
+          WHEN status NOT IN ('completed', 'abandoned') AND exclude_from_backlog = 0 THEN
             COALESCE(hltb_main_story, playtime_minutes * 3, 0) / 3600.0
           ELSE 0
         END
@@ -197,11 +204,14 @@ export function getCandidatesForRecommendation(): Game[] {
   const db = getDatabase();
   return db.getAllSync<Game>(`
     SELECT * FROM games
-    WHERE status IN ('up_next', 'paused', 'not_started')
+    WHERE status IN ('up_next', 'paused', 'not_started', 'playing')
+      AND exclude_from_backlog = 0
     ORDER BY
       CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+      CASE status WHEN 'playing' THEN 0 WHEN 'up_next' THEN 1 WHEN 'paused' THEN 2 ELSE 3 END,
       CASE WHEN hltb_main_story IS NOT NULL THEN hltb_main_story ELSE 99999 END,
-      last_played ASC NULLS FIRST
-    LIMIT 20
+      last_played ASC NULLS FIRST,
+      title ASC
+    LIMIT 60
   `);
 }

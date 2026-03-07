@@ -1,30 +1,45 @@
 {
   "expo": {
-    "name": "Steam Backlog",
+    "name": "GameStack",
     "slug": "steam-backlog-manager",
     "version": "1.0.0",
+    "icon": "./ChatGPT Image 6 mar 2026, 11_44_17 p.m..png",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.steambacklog.app"
     },
     "android": {
       "package": "com.steambacklog.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./ChatGPT Image 6 mar 2026, 11_44_17 p.m..png",
+        "backgroundColor": "#05051a"
+      }
     },
     "web": {
       "bundler": "metro",
       "output": "static"
     },
     "plugins": [
-      "expo-router",
-      "expo-sqlite"
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "steambacklog"
+    "scheme": "steambacklog",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "3c78a46e-6c04-4b9f-8388-41105b176f99"
+      }
+    },
+    "owner": "milsde"
   }
 }

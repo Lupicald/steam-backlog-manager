@@ -1,24 +1,49 @@
 import { searchHLTB } from '../api/hltb';
 import { updateGameHLTB, getAllGames, getGameById } from '../database/queries';
+import { HLTBLookupStatus } from '../types';
+
+export interface HLTBProgress {
+  done: number;
+  total: number;
+  currentTitle: string;
+  enriched: number;
+  notFound: number;
+  failed: number;
+}
+
+export interface HLTBBatchResult {
+  enriched: number;
+  notFound: number;
+  failed: number;
+  stoppedEarly: boolean;
+  lastErrorMessage?: string;
+}
 
 /**
  * Fetch HLTB data for a single game and persist it.
  */
-export async function enrichGameWithHLTB(gameId: number): Promise<boolean> {
+export async function enrichGameWithHLTB(gameId: number): Promise<{
+  status: HLTBLookupStatus;
+  errorMessage?: string;
+}> {
   const game = getGameById(gameId);
-  if (!game) return false;
+  if (!game) {
+    return { status: 'not_found' };
+  }
 
-  const result = await searchHLTB(game.title);
-  if (!result) return false;
+  const lookup = await searchHLTB(game.title);
+  if (lookup.status !== 'success' || !lookup.result) {
+    return { status: lookup.status, errorMessage: lookup.errorMessage };
+  }
 
   updateGameHLTB(
     gameId,
-    result.comp_main || null,
-    result.comp_plus || null,
-    result.comp_100 || null
+    lookup.result.comp_main || null,
+    lookup.result.comp_plus || null,
+    lookup.result.comp_100 || null
   );
 
-  return true;
+  return { status: 'success' };
 }
 
 /**
@@ -26,24 +51,46 @@ export async function enrichGameWithHLTB(gameId: number): Promise<boolean> {
  * Throttled to avoid hammering the HLTB endpoint.
  */
 export async function batchEnrichHLTB(
-  onProgress?: (done: number, total: number) => void,
+  onProgress?: (progress: HLTBProgress) => void,
   signal?: AbortSignal
-): Promise<{ enriched: number; failed: number }> {
+): Promise<HLTBBatchResult> {
   const games = getAllGames().filter(
     (g) => g.hltb_main_story === null && g.status !== 'abandoned'
   );
 
   let enriched = 0;
+  let notFound = 0;
   let failed = 0;
+  let lastErrorMessage: string | undefined;
 
   for (let i = 0; i < games.length; i++) {
-    if (signal?.aborted) break;
+    if (signal?.aborted) {
+      return { enriched, notFound, failed, stoppedEarly: true, lastErrorMessage };
+    }
 
-    const ok = await enrichGameWithHLTB(games[i].id);
-    if (ok) enriched++;
-    else failed++;
+    const currentGame = games[i];
+    const result = await enrichGameWithHLTB(currentGame.id);
+    if (result.status === 'success') {
+      enriched++;
+    } else if (result.status === 'not_found') {
+      notFound++;
+    } else {
+      failed++;
+      lastErrorMessage = result.errorMessage;
+    }
 
-    onProgress?.(i + 1, games.length);
+    onProgress?.({
+      done: i + 1,
+      total: games.length,
+      currentTitle: currentGame.title,
+      enriched,
+      notFound,
+      failed,
+    });
+
+    if (result.status === 'request_failed') {
+      await delay(2000);
+    }
 
     // Polite delay between requests
     if (i < games.length - 1) {
@@ -51,7 +98,7 @@ export async function batchEnrichHLTB(
     }
   }
 
-  return { enriched, failed };
+  return { enriched, notFound, failed, stoppedEarly: false, lastErrorMessage };
 }
 
 function delay(ms: number): Promise<void> {

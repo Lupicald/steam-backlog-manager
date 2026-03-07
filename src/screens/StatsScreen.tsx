@@ -16,6 +16,8 @@ import { SectionHeader } from '../../src/components/SectionHeader';
 import { COLORS } from '../../src/utils/colors';
 import { formatBacklogHours } from '../../src/utils/formatters';
 
+const DAILY_PLAY_SCENARIOS = [1, 2, 3];
+
 export default function StatsScreen() {
   const { stats, refresh } = useGames();
 
@@ -44,6 +46,13 @@ export default function StatsScreen() {
         { label: 'Abandoned', value: stats.abandoned, color: COLORS.red },
         { label: 'Not Started', value: stats.not_started, color: COLORS.textMuted },
       ]
+    : [];
+
+  const realisticBacklog = stats
+    ? DAILY_PLAY_SCENARIOS.map((hoursPerDay) => ({
+        hoursPerDay,
+        label: formatBacklogDuration(stats.total_hours_remaining, hoursPerDay),
+      }))
     : [];
 
   return (
@@ -79,6 +88,22 @@ export default function StatsScreen() {
               <Text style={styles.countdownLabel}>estimated to finish your backlog</Text>
             </GlassCard>
 
+            <View style={styles.section}>
+              <SectionHeader
+                title="Realistic Pace"
+                icon="calendar"
+                iconColor={COLORS.cyan}
+              />
+              <GlassCard padding={16}>
+                {realisticBacklog.map((item) => (
+                  <View key={item.hoursPerDay} style={styles.realisticRow}>
+                    <Text style={styles.realisticLabel}>At {item.hoursPerDay}h/day</Text>
+                    <Text style={styles.realisticValue}>{item.label}</Text>
+                  </View>
+                ))}
+              </GlassCard>
+            </View>
+
             {/* Four stat cards */}
             <View style={styles.row}>
               <StatCard
@@ -109,6 +134,28 @@ export default function StatsScreen() {
                 color={COLORS.rose}
                 subtitle={`${stats.total - stats.completed} remaining`}
               />
+            </View>
+
+            <View style={styles.section}>
+              <SectionHeader
+                title="HLTB Progress"
+                icon="checkmark-done-circle"
+                iconColor={COLORS.green}
+              />
+              <GlassCard padding={16}>
+                <View style={styles.realisticRow}>
+                  <Text style={styles.realisticLabel}>HLTB target met</Text>
+                  <Text style={styles.realisticValue}>{stats.hltb_target_met} games</Text>
+                </View>
+                <View style={styles.realisticRow}>
+                  <Text style={styles.realisticLabel}>Ready to finish now</Text>
+                  <Text style={styles.realisticValue}>{stats.hltb_ready_to_finish} games</Text>
+                </View>
+                <View style={styles.realisticRow}>
+                  <Text style={styles.realisticLabel}>Excluded from calculator</Text>
+                  <Text style={styles.realisticValue}>{stats.excluded_from_backlog} games</Text>
+                </View>
+              </GlassCard>
             </View>
 
             {/* Status breakdown */}
@@ -162,6 +209,28 @@ export default function StatsScreen() {
   );
 }
 
+function formatBacklogDuration(totalHours: number, hoursPerDay: number): string {
+  if (totalHours <= 0 || hoursPerDay <= 0) {
+    return 'Done';
+  }
+
+  const totalDays = totalHours / hoursPerDay;
+  const years = totalDays / 365;
+
+  if (years >= 1) {
+    const roundedYears = Math.round(years * 10) / 10;
+    return `${roundedYears} years`;
+  }
+
+  const months = totalDays / 30;
+  if (months >= 1) {
+    const roundedMonths = Math.round(months * 10) / 10;
+    return `${roundedMonths} months`;
+  }
+
+  return `${Math.ceil(totalDays)} days`;
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.bg },
   scroll: { paddingTop: 60, paddingHorizontal: 20 },
@@ -193,6 +262,23 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', gap: 10 },
   section: { marginTop: 24 },
+  realisticRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.glassBorder,
+  },
+  realisticLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+  },
+  realisticValue: {
+    color: COLORS.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
   breakdownRow: {
     flexDirection: 'row',
     alignItems: 'center',

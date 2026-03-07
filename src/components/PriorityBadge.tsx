@@ -37,14 +37,17 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
+    minHeight: 28,
+    borderRadius: 11,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
     alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   badgeSm: {
-    paddingHorizontal: 6,
+    minHeight: 24,
+    paddingHorizontal: 7,
     paddingVertical: 2,
   },
   icon: {
@@ -56,6 +59,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   labelSm: {
-    fontSize: 9,
+    fontSize: 11,
   },
 });

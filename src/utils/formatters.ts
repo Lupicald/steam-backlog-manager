@@ -24,6 +24,24 @@ export function formatHLTBTime(seconds: number | null): string {
   return `${hours}h`;
 }
 
+export function getRemainingMinutes(
+  hltbSeconds: number | null,
+  playtimeMinutes: number
+): number | null {
+  if (!hltbSeconds || hltbSeconds <= 0) return null;
+  const totalMinutes = Math.round(hltbSeconds / 60);
+  return Math.max(0, totalMinutes - Math.max(0, playtimeMinutes));
+}
+
+export function formatRemainingTime(
+  hltbSeconds: number | null,
+  playtimeMinutes: number
+): string {
+  const remainingMinutes = getRemainingMinutes(hltbSeconds, playtimeMinutes);
+  if (remainingMinutes === null) return '—';
+  return formatMinutes(remainingMinutes);
+}
+
 /**
  * Format a total hours number as a backlog estimate.
  * e.g. 523.5 -> "523 hours"

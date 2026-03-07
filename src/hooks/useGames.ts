@@ -66,6 +66,14 @@ export function useGames() {
     [refresh]
   );
 
+  const setBacklogExclusion = useCallback(
+    (id: number, exclude: boolean) => {
+      updateGame(id, { exclude_from_backlog: exclude ? 1 : 0 });
+      refresh();
+    },
+    [refresh]
+  );
+
   const remove = useCallback(
     (id: number) => {
       deleteGame(id);
@@ -90,6 +98,7 @@ export function useGames() {
     setPriority,
     setProgress,
     setNotes,
+    setBacklogExclusion,
     remove,
     search,
   };

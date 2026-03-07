@@ -24,7 +24,7 @@ import { formatBacklogHours } from '../../src/utils/formatters';
 
 export default function DashboardScreen() {
   const { games, stats, refresh, setStatus, getByStatus } = useGames();
-  const { recommendation, refresh: refreshRec } = useRecommendation();
+  const { recommendation, refresh: refreshRec, reroll } = useRecommendation();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -117,30 +117,35 @@ export default function DashboardScreen() {
         {/* Stats grid */}
         {stats && (
           <View style={styles.statsGrid}>
-            <StatCard
-              label="Total Games"
-              value={stats.total}
-              icon="library"
-              color={COLORS.accent}
-            />
-            <StatCard
-              label="Completed"
-              value={stats.completed}
-              icon="checkmark-circle"
-              color={COLORS.purple}
-            />
-            <StatCard
-              label="Playing"
-              value={stats.playing}
-              icon="play-circle"
-              color={COLORS.green}
-            />
-            <StatCard
-              label="Up Next"
-              value={stats.up_next}
-              icon="bookmark"
-              color={COLORS.blue}
-            />
+            <View style={styles.statsRow}>
+              <StatCard
+                label="Total Games"
+                value={stats.total}
+                icon="library"
+                color={COLORS.accent}
+              />
+              <StatCard
+                label="Playing"
+                value={stats.playing}
+                icon="play-circle"
+                color={COLORS.green}
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <StatCard
+                label="Up Next"
+                value={stats.up_next}
+                icon="bookmark"
+                color={COLORS.blue}
+              />
+              <StatCard
+                label="HLTB Met"
+                value={stats.hltb_target_met}
+                icon="checkmark-done-circle"
+                color={COLORS.cyan}
+                subtitle={`${stats.completed} completed`}
+              />
+            </View>
           </View>
         )}
 
@@ -218,6 +223,7 @@ export default function DashboardScreen() {
       <PickNextGameModal
         visible={modalVisible}
         recommendation={recommendation}
+        onReroll={reroll}
         onClose={() => setModalVisible(false)}
       />
     </View>
@@ -276,10 +282,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 10,
     marginBottom: 28,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   section: {
     marginBottom: 28,

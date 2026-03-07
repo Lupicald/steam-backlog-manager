@@ -31,9 +31,12 @@ export function initializeDatabase(): void {
       added_at            TEXT    NOT NULL DEFAULT (datetime('now')),
       notes               TEXT    NOT NULL DEFAULT '',
       progress_percentage INTEGER NOT NULL DEFAULT 0,
-      sort_order          INTEGER NOT NULL DEFAULT 0
+      sort_order          INTEGER NOT NULL DEFAULT 0,
+      exclude_from_backlog INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  ensureColumn(db, 'games', 'exclude_from_backlog', `INTEGER NOT NULL DEFAULT 0`);
 
   // Settings table (key-value store)
   db.execSync(`
@@ -57,4 +60,17 @@ export function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_games_status   ON games(status);
     CREATE INDEX IF NOT EXISTS idx_games_priority ON games(priority);
   `);
+}
+
+function ensureColumn(
+  db: SQLite.SQLiteDatabase,
+  tableName: string,
+  columnName: string,
+  columnDefinition: string
+): void {
+  const columns = db.getAllSync<{ name: string }>(`PRAGMA table_info(${tableName});`);
+  const exists = columns.some((column) => column.name === columnName);
+  if (!exists) {
+    db.execSync(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition};`);
+  }
 }

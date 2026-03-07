@@ -9,6 +9,7 @@ import {
   Alert,
   StatusBar,
   Dimensions,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -25,6 +26,8 @@ import {
   formatMinutes,
   formatHLTBTime,
   formatLastPlayed,
+  formatRemainingTime,
+  getRemainingMinutes,
 } from '../../src/utils/formatters';
 import { COLORS } from '../../src/utils/colors';
 import { Game, GameStatus, GamePriority, STATUS_CONFIG, PRIORITY_CONFIG } from '../../src/types';
@@ -35,7 +38,7 @@ const COVER_HEIGHT = width * 0.52;
 export default function GameDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { getById, setStatus, setPriority, setProgress, setNotes, remove, refresh } =
+  const { getById, setStatus, setPriority, setProgress, setNotes, remove, refresh, setBacklogExclusion } =
     useGames();
 
   const [game, setGame] = useState<Game | null>(null);
@@ -80,11 +83,16 @@ export default function GameDetailScreen() {
   const handleFetchHLTB = async () => {
     if (!game) return;
     setFetching(true);
-    const ok = await enrichGameWithHLTB(game.id);
+    const result = await enrichGameWithHLTB(game.id);
     setFetching(false);
     refresh();
     load();
-    if (!ok) Alert.alert('Not found', 'Could not find this game on HowLongToBeat.');
+    if (result.status === 'not_found') {
+      Alert.alert('Not found', 'Could not find this game on HowLongToBeat.');
+    }
+    if (result.status === 'request_failed') {
+      Alert.alert('HLTB request failed', result.errorMessage ?? 'The HLTB request was blocked.');
+    }
   };
 
   const handleDelete = () => {
@@ -110,6 +118,7 @@ export default function GameDetailScreen() {
   }
 
   const statusConfig = STATUS_CONFIG[game.status];
+  const remainingMinutes = getRemainingMinutes(game.hltb_main_story, game.playtime_minutes);
 
   return (
     <View style={styles.root}>
@@ -184,6 +193,14 @@ export default function GameDetailScreen() {
               <HLTBStat label="Extra" value={formatHLTBTime(game.hltb_extra)} color={COLORS.teal} />
               <HLTBStat label="Completionist" value={formatHLTBTime(game.hltb_completionist)} color={COLORS.violet} />
             </View>
+            {remainingMinutes !== null && (
+              <View style={styles.remainingRow}>
+                <Text style={styles.remainingLabel}>Remaining</Text>
+                <Text style={styles.remainingValue}>
+                  {formatRemainingTime(game.hltb_main_story, game.playtime_minutes)}
+                </Text>
+              </View>
+            )}
           </GlassCard>
 
           {/* Progress */}
@@ -215,6 +232,30 @@ export default function GameDetailScreen() {
               thumbTintColor={COLORS.accent}
               style={{ marginTop: 8 }}
             />
+          </GlassCard>
+
+          <GlassCard style={styles.card} padding={16}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="calculator-outline" size={16} color={COLORS.cyan} />
+              <Text style={styles.cardTitle}>Backlog Calculator</Text>
+            </View>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleInfo}>
+                <Text style={styles.toggleTitle}>Exclude from total backlog hours</Text>
+                <Text style={styles.toggleSubtitle}>
+                  Hide this game from the finish-time estimate without deleting it.
+                </Text>
+              </View>
+              <Switch
+                value={game.exclude_from_backlog === 1}
+                onValueChange={(value) => {
+                  setBacklogExclusion(game.id, value);
+                  setGame((current) => (current ? { ...current, exclude_from_backlog: value ? 1 : 0 } : current));
+                }}
+                trackColor={{ false: COLORS.glassMedium, true: COLORS.cyan + '88' }}
+                thumbColor={game.exclude_from_backlog === 1 ? COLORS.cyan : COLORS.textPrimary}
+              />
+            </View>
           </GlassCard>
 
           {/* Status selector */}
@@ -395,6 +436,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
+  remainingRow: {
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.glassBorder,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  remainingLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+  },
+  remainingValue: {
+    color: COLORS.cyan,
+    fontSize: 16,
+    fontWeight: '800',
+  },
   hltbStat: { alignItems: 'center', gap: 4 },
   hltbValue: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   hltbLabel: { color: COLORS.textMuted, fontSize: 11 },
@@ -430,6 +489,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  toggleInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  toggleTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  toggleSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   notesInput: {
     color: COLORS.textPrimary,

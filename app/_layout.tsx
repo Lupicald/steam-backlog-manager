@@ -16,6 +16,10 @@ export default function RootLayout() {
     }
   }, [ready]);
 
+  if (!ready) {
+    return null;
+  }
+
   return (
     <>
       <StatusBar style="light" />

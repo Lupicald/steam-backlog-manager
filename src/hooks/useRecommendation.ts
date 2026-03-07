@@ -35,15 +35,45 @@ function buildReason(game: Game): string {
   if (game.status === 'playing') return 'You are currently playing this';
   if (game.status === 'paused') return "You've started this — time to finish it";
   if (game.priority === 'high') return 'Marked as high priority';
+  if (game.priority === 'medium' && game.hltb_main_story && game.hltb_main_story / 3600 <= 12)
+    return 'Balanced pick with a reasonable finish time';
   if (game.hltb_main_story && game.hltb_main_story / 3600 <= 5)
     return 'Short game — great for clearing your backlog';
   if (!game.last_played) return "You've never played this";
   return 'Good match based on your backlog';
 }
 
+function buildRecommendations(candidates: Game[]): Recommendation[] {
+  return candidates
+    .map((game) => ({
+      game,
+      score: scoreGame(game),
+      reason: buildReason(game),
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
+function pickRecommendation(
+  recommendations: Recommendation[],
+  excludeGameId?: number
+): Recommendation | null {
+  const available = excludeGameId
+    ? recommendations.filter((item) => item.game.id !== excludeGameId)
+    : recommendations;
+
+  if (available.length === 0) {
+    return null;
+  }
+
+  const topPool = available.slice(0, Math.min(12, available.length));
+  const randomIndex = Math.floor(Math.random() * topPool.length);
+  return topPool[randomIndex] ?? available[0] ?? null;
+}
+
 export function useRecommendation(): {
   recommendation: Recommendation | null;
   refresh: () => void;
+  reroll: () => void;
 } {
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
 
@@ -53,14 +83,19 @@ export function useRecommendation(): {
       setRecommendation(null);
       return;
     }
-    const scored: Recommendation[] = candidates.map((game) => ({
-      game,
-      score: scoreGame(game),
-      reason: buildReason(game),
-    }));
-    scored.sort((a, b) => b.score - a.score);
-    setRecommendation(scored[0] ?? null);
+    const scored = buildRecommendations(candidates);
+    setRecommendation(pickRecommendation(scored));
   }, []);
 
-  return { recommendation, refresh };
+  const reroll = useCallback(() => {
+    const candidates = getCandidatesForRecommendation();
+    if (candidates.length === 0) {
+      setRecommendation(null);
+      return;
+    }
+    const scored = buildRecommendations(candidates);
+    setRecommendation((current) => pickRecommendation(scored, current?.game.id));
+  }, []);
+
+  return { recommendation, refresh, reroll };
 }

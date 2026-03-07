@@ -24,6 +24,7 @@ export interface Game {
   notes: string;
   progress_percentage: number;
   sort_order: number;
+  exclude_from_backlog: number;
 }
 
 export interface SteamGame {
@@ -49,6 +50,8 @@ export interface HLTBResult {
   comp_100: number;
 }
 
+export type HLTBLookupStatus = 'success' | 'not_found' | 'request_failed';
+
 export interface BacklogStats {
   total: number;
   playing: number;
@@ -59,6 +62,9 @@ export interface BacklogStats {
   not_started: number;
   total_hours_remaining: number;
   total_playtime_hours: number;
+  excluded_from_backlog: number;
+  hltb_target_met: number;
+  hltb_ready_to_finish: number;
 }
 
 export interface Recommendation {

@@ -28,6 +28,14 @@ export default function SettingsScreen() {
   const [importing, setImporting] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [hltbProgress, setHltbProgress] = useState<{
+    done: number;
+    total: number;
+    currentTitle: string;
+    enriched: number;
+    notFound: number;
+    failed: number;
+  } | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
 
   useFocusEffect(
@@ -71,14 +79,18 @@ export default function SettingsScreen() {
   const handleEnrichHLTB = async () => {
     setEnriching(true);
     setProgress(null);
-    const { enriched, failed } = await batchEnrichHLTB((done, total) => {
-      setProgress({ done, total });
+    setHltbProgress(null);
+    const result = await batchEnrichHLTB((next) => {
+      setHltbProgress(next);
     });
     setEnriching(false);
     setProgress(null);
+    setHltbProgress(null);
     Alert.alert(
       'HLTB Sync Done',
-      `Enriched ${enriched} games.${failed > 0 ? ` ${failed} not found.` : ''}`
+      result.stoppedEarly
+        ? `Synced ${result.enriched} successfully, ${result.notFound} not found and ${result.failed} request errors. Last error: ${result.lastErrorMessage ?? 'Unknown error'}`
+        : `Synced ${result.enriched} successfully and ${result.notFound} were not found.${result.failed > 0 ? ` ${result.failed} request errors.` : ''}`
     );
   };
 
@@ -210,18 +222,27 @@ export default function SettingsScreen() {
               don't have HLTB data yet.
             </Text>
 
-            {enriching && progress && (
+            {enriching && hltbProgress && (
               <View style={styles.progressWrap}>
                 <View style={styles.progressTrack}>
                   <View
                     style={[
                       styles.progressFill,
-                      { width: `${progressPct}%` as any, backgroundColor: COLORS.violet },
+                      {
+                        width: `${Math.round((hltbProgress.done / hltbProgress.total) * 100)}%` as any,
+                        backgroundColor: COLORS.violet,
+                      },
                     ]}
                   />
                 </View>
+                <Text style={styles.progressTitle} numberOfLines={1}>
+                  {hltbProgress.currentTitle}
+                </Text>
                 <Text style={styles.progressLabel}>
-                  {progress.done} / {progress.total}
+                  {hltbProgress.done} / {hltbProgress.total} processed · {hltbProgress.total - hltbProgress.done} remaining
+                </Text>
+                <Text style={styles.progressLabel}>
+                  {hltbProgress.enriched} successful · {hltbProgress.notFound} not found · {hltbProgress.failed} errors
                 </Text>
               </View>
             )}
@@ -263,7 +284,7 @@ function FieldLabel({ label, hint, hintLink }: { label: string; hint?: string; h
           disabled={!hintLink}
           onPress={() => hintLink && Linking.openURL(hintLink)}
         >
-          <Text style={[styles.fieldHint, hintLink && { color: COLORS.accent }]}>{hint}</Text>
+          <Text style={[styles.fieldHint, hintLink ? { color: COLORS.accent } : undefined]}>{hint}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -378,6 +399,11 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 99,
     backgroundColor: COLORS.teal,
+  },
+  progressTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   progressLabel: { color: COLORS.textMuted, fontSize: 11, textAlign: 'right' },
   resultChip: {

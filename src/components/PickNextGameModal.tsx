@@ -24,12 +24,14 @@ const { width } = Dimensions.get('window');
 interface PickNextGameModalProps {
   visible: boolean;
   recommendation: Recommendation | null;
+  onReroll: () => void;
   onClose: () => void;
 }
 
 export function PickNextGameModal({
   visible,
   recommendation,
+  onReroll,
   onClose,
 }: PickNextGameModalProps) {
   const router = useRouter();
@@ -113,16 +115,23 @@ export function PickNextGameModal({
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.ctaButton} onPress={handleOpen} activeOpacity={0.85}>
-                <LinearGradient
-                  colors={[COLORS.accent, COLORS.accentAlt]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFill}
-                />
-                <Ionicons name="play" size={18} color="#fff" />
-                <Text style={styles.ctaText}>Let's Play This</Text>
-              </TouchableOpacity>
+              <View style={styles.actions}>
+                <TouchableOpacity style={styles.rerollButton} onPress={onReroll} activeOpacity={0.82}>
+                  <Ionicons name="refresh" size={18} color={COLORS.textPrimary} />
+                  <Text style={styles.rerollText}>Reroll</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.ctaButton} onPress={handleOpen} activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={[COLORS.accent, COLORS.accentAlt]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <Ionicons name="play" size={18} color="#fff" />
+                  <Text style={styles.ctaText}>Let's Play This</Text>
+                </TouchableOpacity>
+              </View>
             </>
           ) : (
             <View style={styles.empty}>
@@ -237,7 +246,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   ctaButton: {
-    marginTop: 24,
+    flex: 1,
     height: 52,
     borderRadius: 16,
     flexDirection: 'row',
@@ -245,6 +254,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     overflow: 'hidden',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  rerollButton: {
+    width: 118,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    backgroundColor: COLORS.glass,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  rerollText: {
+    color: COLORS.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   ctaText: {
     color: '#fff',

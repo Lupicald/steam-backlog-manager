@@ -14,7 +14,13 @@ import { Game, GameStatus, STATUS_CONFIG } from '../types';
 import { GameCover } from './GameCover';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
-import { formatMinutes, formatHLTBTime, truncate } from '../utils/formatters';
+import {
+  formatMinutes,
+  formatHLTBTime,
+  formatRemainingTime,
+  getRemainingMinutes,
+  truncate,
+} from '../utils/formatters';
 import { COLORS } from '../utils/colors';
 
 interface GameCardProps {
@@ -45,6 +51,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
   const openDetail = () => router.push(`/game/${game.id}`);
 
   const progressWidth = `${Math.min(100, game.progress_percentage)}%`;
+  const remainingMinutes = getRemainingMinutes(game.hltb_main_story, game.playtime_minutes);
 
   if (compact) {
     return (
@@ -108,6 +115,14 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
                 </Text>
               </View>
             ) : null}
+            {remainingMinutes !== null ? (
+              <View style={styles.metaItem}>
+                <Ionicons name="hourglass-outline" size={11} color={COLORS.cyan} />
+                <Text style={[styles.metaText, styles.remainingText]}>
+                  {formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} left
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -154,12 +169,13 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 12,
     gap: 12,
   },
   info: {
     flex: 1,
+    minWidth: 0,
     gap: 6,
   },
   title: {
@@ -176,6 +192,7 @@ const styles = StyleSheet.create({
   },
   meta: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
   metaItem: {
@@ -187,14 +204,20 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 11,
   },
+  remainingText: {
+    color: COLORS.cyan,
+  },
   statusBtn: {
+    width: 42,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   statusDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
