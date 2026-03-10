@@ -1,39 +1,57 @@
-name: EAS Android Release Build
+name: Android Release Build (Local)
 
 on:
   push:
     branches:
-      - main # Change this if your main branch has a different name
-  workflow_dispatch: # Allows you to trigger the build manually from GitHub UI
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build Android AAB
     runs-on: ubuntu-latest
     steps:
-      - name: 🏗 Setup repository
+      - name: Setup repository
         uses: actions/checkout@v3
 
-      - name: 🏗 Setup Node
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 18.x
           cache: npm
 
-      - name: 🏗 Setup Java (Required for Expo Android builds)
+      - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🏗 Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: 🚀 Build on EAS
-        run: eas build --platform android --profile production --non-interactive
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Decode keystore
+        run: |
+          mkdir -p .credentials
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > .credentials/android-upload-keystore.jks
+
+      - name: Build release AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/.credentials/android-upload-keystore.jks" \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
