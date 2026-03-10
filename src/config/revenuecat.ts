@@ -12,7 +12,7 @@
  * billing will not be active for real users until swapped.
  */
 
-export const RC_ANDROID_API_KEY = 'test_IRoJyPXslDGSoKPAztkeEHieVlp';
+export const RC_ANDROID_API_KEY = 'goog_IvHJULqJCHsOQPJkLzMuYfLhkFx';
 export const RC_IOS_API_KEY = 'test_IRoJyPXslDGSoKPAztkeEHieVlp';
 
 /** The entitlement identifier configured in the RevenueCat dashboard. */
