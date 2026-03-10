@@ -8,27 +8,26 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
 import { useGames } from '../../src/hooks/useGames';
 import { GameCard } from '../../src/components/GameCard';
 import { useAppContext } from '../../src/hooks/useAppContext';
-import { ThemeColors } from '../../src/services/themeService';
-import { Game, GameStatus, STATUS_CONFIG } from '../../src/types';
+import { Game, GameStatus, Platform as GamePlatform } from '../../src/types';
 import { priorityWeight } from '../../src/utils/formatters';
+import { ManualGameModal } from '../components/ManualGameModal';
+import { t, Language } from '../../src/i18n';
 
-const FILTER_TABS: { key: GameStatus | 'all'; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'playing', label: 'Playing' },
-  { key: 'up_next', label: 'Up Next' },
-  { key: 'paused', label: 'Paused' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'abandoned', label: 'Abandoned' },
-  { key: 'not_started', label: 'Not Started' },
-];
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+type PlatformMode = 'all' | GamePlatform;
 
 type SortMode =
   | 'priority_high'
@@ -42,32 +41,68 @@ type SortMode =
   | 'alphabetical_desc';
 type ShortMode = 'all' | 'under_5' | 'under_10';
 
-const SORT_OPTIONS: { key: SortMode; label: string }[] = [
-  { key: 'priority_high', label: 'High priority' },
-  { key: 'priority_low', label: 'Low priority' },
-  { key: 'hltb_met', label: 'HLTB met' },
-  { key: 'shortest', label: 'Shortest' },
-  { key: 'longest', label: 'Longest' },
-  { key: 'recently_played', label: 'Recently played' },
-  { key: 'least_recently_played', label: 'Oldest played' },
-  { key: 'alphabetical_asc', label: 'A-Z' },
-  { key: 'alphabetical_desc', label: 'Z-A' },
-];
+function getFilterTabs(lang: Language): { key: GameStatus | 'all'; label: string }[] {
+  return [
+    { key: 'all', label: t('lib_tab_all', lang) },
+    { key: 'playing', label: t('lib_tab_playing', lang) },
+    { key: 'up_next', label: t('lib_tab_up_next', lang) },
+    { key: 'paused', label: t('lib_tab_paused', lang) },
+    { key: 'completed', label: t('lib_tab_completed', lang) },
+    { key: 'abandoned', label: t('lib_tab_abandoned', lang) },
+    { key: 'not_started', label: t('lib_tab_not_started', lang) },
+  ];
+}
 
-const SHORT_OPTIONS: { key: ShortMode; label: string }[] = [
-  { key: 'all', label: 'All lengths' },
-  { key: 'under_5', label: 'Under 5h' },
-  { key: 'under_10', label: 'Under 10h' },
-];
+function getSortOptions(lang: Language): { key: SortMode; label: string }[] {
+  return [
+    { key: 'priority_high', label: t('sort_priority_high', lang) },
+    { key: 'priority_low', label: t('sort_priority_low', lang) },
+    { key: 'hltb_met', label: t('sort_hltb', lang) },
+    { key: 'shortest', label: t('sort_shortest', lang) },
+    { key: 'longest', label: t('sort_longest', lang) },
+    { key: 'recently_played', label: t('sort_recent', lang) },
+    { key: 'least_recently_played', label: t('sort_oldest', lang) },
+    { key: 'alphabetical_asc', label: t('sort_az', lang) },
+    { key: 'alphabetical_desc', label: t('sort_za', lang) },
+  ];
+}
+
+function getShortOptions(lang: Language): { key: ShortMode; label: string }[] {
+  return [
+    { key: 'all', label: t('lib_short_all', lang) },
+    { key: 'under_5', label: t('lib_short_5', lang) },
+    { key: 'under_10', label: t('lib_short_10', lang) },
+  ];
+}
+
+function getPlatformOptions(lang: Language): { key: PlatformMode; label: string }[] {
+  return [
+    { key: 'all', label: t('lib_all', lang) },
+    { key: 'steam', label: 'Steam' },
+    { key: 'gog', label: 'GOG' },
+    { key: 'epic', label: 'Epic' },
+    { key: 'playstation', label: 'PlayStation' },
+    { key: 'xbox', label: 'Xbox' },
+    { key: 'nintendo', label: 'Nintendo' },
+    { key: 'other', label: 'Other' },
+  ];
+}
 
 export default function LibraryScreen() {
-  const { themeColors } = useAppContext();
-  const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
-  const { games, refresh, setStatus, search } = useGames();
+  const { themeColors, language } = useAppContext();
+  const { games, refresh, search, setStatus } = useGames();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<GameStatus | 'all'>('all');
+  const [platformMode, setPlatformMode] = useState<PlatformMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('priority_high');
   const [shortMode, setShortMode] = useState<ShortMode>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+
+  const FILTER_TABS = getFilterTabs(language);
+  const SORT_OPTIONS = getSortOptions(language);
+  const SHORT_OPTIONS = getShortOptions(language);
+  const PLATFORM_OPTIONS = getPlatformOptions(language);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,337 +110,351 @@ export default function LibraryScreen() {
     }, [refresh])
   );
 
+  const toggleFilters = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFiltersOpen((v) => !v);
+  };
+
+  const clearFilters = () => {
+    setPlatformMode('all');
+    setSortMode('priority_high');
+    setShortMode('all');
+  };
+
+  const hasActiveFilters = platformMode !== 'all' || sortMode !== 'priority_high' || shortMode !== 'all';
+
   const filtered: Game[] = (() => {
     let list = query.trim() ? search(query) : games;
     if (filter !== 'all') list = list.filter((g) => g.status === filter);
-
+    if (platformMode !== 'all') list = list.filter((g) => g.platform === platformMode);
     if (shortMode !== 'all') {
       const maxSeconds = shortMode === 'under_5' ? 5 * 3600 : 10 * 3600;
       list = list.filter((g) => g.hltb_main_story !== null && g.hltb_main_story <= maxSeconds);
     }
-
     return [...list].sort((a, b) => compareGames(a, b, sortMode));
   })();
 
-  const renderFilters = () => (
-    <View style={styles.filterBlock}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabList}
-        style={styles.tabScroller}
-      >
-        {FILTER_TABS.map((item) => {
-          const active = filter === item.key;
-          const color =
-            item.key === 'all'
-              ? themeColors.accent
-              : STATUS_CONFIG[item.key as GameStatus]?.color ?? themeColors.accent;
-
-          return (
-            <TouchableOpacity
-              key={item.key}
-              onPress={() => setFilter(item.key)}
-              style={[
-                styles.tab,
-                active && {
-                  backgroundColor: color + '22',
-                  borderColor: color + '55',
-                },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: active ? color : themeColors.textSecondary },
-                ]}
-                numberOfLines={1}
-              >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.controlSection}>
-        <Text style={styles.controlTitle}>Sort backlog</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.controlList}>
-          {SORT_OPTIONS.map((item) => {
-            const active = sortMode === item.key;
-            return (
-              <TouchableOpacity
-                key={item.key}
-                onPress={() => setSortMode(item.key)}
-                style={[styles.controlChip, active && styles.controlChipActive]}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.controlChipText, active && styles.controlChipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      <View style={styles.controlSection}>
-        <Text style={styles.controlTitle}>Short games mode</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.controlList}>
-          {SHORT_OPTIONS.map((item) => {
-            const active = shortMode === item.key;
-            return (
-              <TouchableOpacity
-                key={item.key}
-                onPress={() => setShortMode(item.key)}
-                style={[styles.controlChip, active && styles.shortChipActive]}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.controlChipText, active && styles.controlChipTextActive]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </View>
-  );
+  const activeChips: string[] = [];
+  if (platformMode !== 'all') activeChips.push(platformMode.toUpperCase());
+  if (sortMode !== 'priority_high') activeChips.push(SORT_OPTIONS.find((s) => s.key === sortMode)?.label ?? sortMode);
+  if (shortMode !== 'all') activeChips.push(SHORT_OPTIONS.find((s) => s.key === shortMode)?.label ?? shortMode);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
       <StatusBar barStyle="light-content" />
-      <LinearGradient
-        colors={[themeColors.bg, themeColors.card]}
-        style={StyleSheet.absoluteFill}
-      />
+      <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Library</Text>
-        <Text style={styles.subtitle}>{filtered.length} games</Text>
-      </View>
-
-      {/* Search bar */}
-      <View style={styles.searchWrap}>
-        <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: themeColors.glass }]} />
-        <Ionicons name="search" size={17} color={themeColors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search games…"
-          placeholderTextColor={themeColors.textMuted}
-          returnKeyType="search"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')}>
-            <Ionicons name="close-circle" size={17} color={themeColors.textMuted} />
+      {/* Fixed header */}
+      <View style={styles.headerWrap}>
+        {/* Title row */}
+        <View style={styles.titleRow}>
+          <View>
+            <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('lib_title', language)}</Text>
+            <Text style={[styles.gameCount, { color: themeColors.textMuted }]}>
+              {filtered.length} {filtered.length === 1 ? t('lib_game', language) : t('lib_games', language)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: themeColors.accent }]}
+            onPress={() => setManualModalOpen(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.addBtnText}>{t('lib_add_game', language)}</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Search + Filter toggle row */}
+        <View style={styles.searchRow}>
+          <View style={[styles.searchWrap, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.glass }]}>
+            <Ionicons name="search" size={16} color={themeColors.textMuted} />
+            <TextInput
+              style={[styles.searchInput, { color: themeColors.textPrimary }]}
+              placeholder={t('lib_search', language)}
+              placeholderTextColor={themeColors.textMuted}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')}>
+                <Ionicons name="close-circle" size={16} color={themeColors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.filterToggleBtn,
+              {
+                borderColor: filtersOpen || hasActiveFilters ? themeColors.accent : themeColors.glassBorder,
+                backgroundColor: filtersOpen || hasActiveFilters ? themeColors.accent + '22' : themeColors.glass,
+              },
+            ]}
+            onPress={toggleFilters}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={filtersOpen || hasActiveFilters ? themeColors.accent : themeColors.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Collapsible filter panel */}
+        {filtersOpen && (
+          <View style={[styles.filterPanel, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
+            {/* Platform */}
+            <Text style={[styles.filterSectionLabel, { color: themeColors.textMuted }]}>{t('lib_platform', language)}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              <View style={styles.chipRow}>
+                {PLATFORM_OPTIONS.map((opt) => {
+                  const active = platformMode === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.chip, { borderColor: active ? themeColors.accent : themeColors.glassBorder, backgroundColor: active ? themeColors.accent + '22' : 'transparent' }]}
+                      onPress={() => setPlatformMode(opt.key)}
+                    >
+                      <Text style={[styles.chipText, { color: active ? themeColors.accent : themeColors.textSecondary }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* Sort */}
+            <Text style={[styles.filterSectionLabel, { color: themeColors.textMuted }]}>{t('lib_sort', language)}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              <View style={styles.chipRow}>
+                {SORT_OPTIONS.map((opt) => {
+                  const active = sortMode === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[styles.chip, { borderColor: active ? themeColors.violet : themeColors.glassBorder, backgroundColor: active ? themeColors.violet + '22' : 'transparent' }]}
+                      onPress={() => setSortMode(opt.key)}
+                    >
+                      <Text style={[styles.chipText, { color: active ? themeColors.violet : themeColors.textSecondary }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* Duration */}
+            <Text style={[styles.filterSectionLabel, { color: themeColors.textMuted }]}>{t('lib_duration', language)}</Text>
+            <View style={styles.chipRow}>
+              {SHORT_OPTIONS.map((opt) => {
+                const active = shortMode === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.chip, { borderColor: active ? themeColors.teal : themeColors.glassBorder, backgroundColor: active ? themeColors.teal + '22' : 'transparent' }]}
+                    onPress={() => setShortMode(opt.key)}
+                  >
+                    <Text style={[styles.chipText, { color: active ? themeColors.teal : themeColors.textSecondary }]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
         )}
+
+        {/* Active filter chips */}
+        {activeChips.length > 0 && (
+          <View style={styles.activeChipsRow}>
+            {activeChips.map((chip) => (
+              <View key={chip} style={[styles.activeChip, { borderColor: themeColors.accent + '55', backgroundColor: themeColors.accent + '14' }]}>
+                <Text style={[styles.activeChipText, { color: themeColors.accent }]}>{chip}</Text>
+              </View>
+            ))}
+            <TouchableOpacity onPress={clearFilters} style={[styles.clearBtn, { borderColor: themeColors.glassBorder }]}>
+              <Text style={[styles.clearBtnText, { color: themeColors.textMuted }]}>{t('lib_clear', language)}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Status tabs */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabList}
+          style={styles.tabScroller}
+        >
+          {FILTER_TABS.map((tab) => {
+            const active = filter === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.tab,
+                  {
+                    backgroundColor: active ? themeColors.accent : themeColors.glass,
+                    borderColor: active ? themeColors.accent : themeColors.glassBorder,
+                  },
+                ]}
+                onPress={() => setFilter(tab.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.tabText, { color: active ? '#fff' : themeColors.textSecondary }]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Game list */}
+      {/* Games list */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        ListHeaderComponent={renderFilters}
-        renderItem={({ item }) => (
-          <GameCard game={item} onStatusChange={setStatus} />
-        )}
+        renderItem={({ item }) => <GameCard game={item} onStatusChange={setStatus} />}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="game-controller-outline" size={48} color={themeColors.textMuted} />
-            <Text style={styles.emptyText}>No games found</Text>
+            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>{t('lib_empty_title', language)}</Text>
+            <Text style={[styles.emptySubtitle, { color: themeColors.textMuted }]}>
+              {query ? t('lib_empty_search', language) : t('lib_empty_add', language)}
+            </Text>
           </View>
         }
+        showsVerticalScrollIndicator={false}
+      />
+      <ManualGameModal
+        visible={manualModalOpen}
+        onClose={() => setManualModalOpen(false)}
+        onGameAdded={() => { refresh(); }}
       />
     </View>
   );
 }
 
-function compareGames(a: Game, b: Game, sortMode: SortMode): number {
-  switch (sortMode) {
+function compareGames(a: Game, b: Game, mode: SortMode): number {
+  switch (mode) {
+    case 'priority_high':
+      return priorityWeight(b.priority) - priorityWeight(a.priority) || a.title.localeCompare(b.title);
+    case 'priority_low':
+      return priorityWeight(a.priority) - priorityWeight(b.priority) || a.title.localeCompare(b.title);
+    case 'hltb_met': {
+      const aPlayedSec = (a.playtime_minutes ?? 0) * 60;
+      const bPlayedSec = (b.playtime_minutes ?? 0) * 60;
+      const aMet = a.hltb_main_story !== null && aPlayedSec >= a.hltb_main_story ? 1 : 0;
+      const bMet = b.hltb_main_story !== null && bPlayedSec >= b.hltb_main_story ? 1 : 0;
+      if (bMet !== aMet) return bMet - aMet;
+      if (aMet && bMet) return bPlayedSec - aPlayedSec;
+      return a.title.localeCompare(b.title);
+    }
+    case 'shortest':
+      return (a.hltb_main_story ?? Infinity) - (b.hltb_main_story ?? Infinity);
+    case 'longest':
+      return (b.hltb_main_story ?? 0) - (a.hltb_main_story ?? 0);
+    case 'recently_played': {
+      const da = a.last_played ? new Date(a.last_played).getTime() : 0;
+      const db2 = b.last_played ? new Date(b.last_played).getTime() : 0;
+      return db2 - da;
+    }
+    case 'least_recently_played': {
+      const da = a.last_played ? new Date(a.last_played).getTime() : Infinity;
+      const db2 = b.last_played ? new Date(b.last_played).getTime() : Infinity;
+      return da - db2;
+    }
     case 'alphabetical_asc':
       return a.title.localeCompare(b.title);
     case 'alphabetical_desc':
       return b.title.localeCompare(a.title);
-    case 'shortest': {
-      const aDuration = a.hltb_main_story ?? Number.MAX_SAFE_INTEGER;
-      const bDuration = b.hltb_main_story ?? Number.MAX_SAFE_INTEGER;
-      if (aDuration !== bDuration) return aDuration - bDuration;
-      return a.title.localeCompare(b.title);
-    }
-    case 'longest': {
-      const aDuration = a.hltb_main_story ?? -1;
-      const bDuration = b.hltb_main_story ?? -1;
-      if (aDuration !== bDuration) return bDuration - aDuration;
-      return a.title.localeCompare(b.title);
-    }
-    case 'recently_played': {
-      const aTime = a.last_played ? new Date(a.last_played).getTime() : 0;
-      const bTime = b.last_played ? new Date(b.last_played).getTime() : 0;
-      if (aTime !== bTime) return bTime - aTime;
-      return a.title.localeCompare(b.title);
-    }
-    case 'least_recently_played': {
-      const aTime = a.last_played ? new Date(a.last_played).getTime() : 0;
-      const bTime = b.last_played ? new Date(b.last_played).getTime() : 0;
-      if (aTime !== bTime) return aTime - bTime;
-      return a.title.localeCompare(b.title);
-    }
-    case 'hltb_met': {
-      const aMet = a.hltb_main_story !== null && a.playtime_minutes * 60 >= a.hltb_main_story ? 1 : 0;
-      const bMet = b.hltb_main_story !== null && b.playtime_minutes * 60 >= b.hltb_main_story ? 1 : 0;
-      if (aMet !== bMet) return bMet - aMet;
-      const aRemaining = a.hltb_main_story !== null ? Math.max(0, a.hltb_main_story - a.playtime_minutes * 60) : Number.MAX_SAFE_INTEGER;
-      const bRemaining = b.hltb_main_story !== null ? Math.max(0, b.hltb_main_story - b.playtime_minutes * 60) : Number.MAX_SAFE_INTEGER;
-      if (aRemaining !== bRemaining) return aRemaining - bRemaining;
-      return a.title.localeCompare(b.title);
-    }
-    case 'priority_low': {
-      const priorityDelta = priorityWeight(a.priority) - priorityWeight(b.priority);
-      if (priorityDelta !== 0) return priorityDelta;
-      return a.title.localeCompare(b.title);
-    }
-    case 'priority_high':
-    default: {
-      const priorityDelta = priorityWeight(b.priority) - priorityWeight(a.priority);
-      if (priorityDelta !== 0) return priorityDelta;
-      const durationDelta = (a.hltb_main_story ?? Number.MAX_SAFE_INTEGER) - (b.hltb_main_story ?? Number.MAX_SAFE_INTEGER);
-      if (durationDelta !== 0) return durationDelta;
-      return a.title.localeCompare(b.title);
-    }
+    default:
+      return 0;
   }
 }
 
-const getStyles = (themeColors: ThemeColors) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: themeColors.bg,
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  headerWrap: {
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    zIndex: 10,
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  title: {
-    color: themeColors.textPrimary,
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: themeColors.textMuted,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  searchWrap: {
-    marginHorizontal: 20,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: themeColors.glassBorder,
-    overflow: 'hidden',
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  searchInput: {
-    flex: 1,
-    color: themeColors.textPrimary,
-    fontSize: 15,
-  },
-  tabList: {
-    paddingHorizontal: 20,
-    gap: 8,
-    paddingRight: 28,
-    marginBottom: 12,
-  },
-  tabScroller: {
-    maxHeight: 54,
-  },
-  filterBlock: {
-    marginBottom: 10,
-  },
-  tab: {
-    minWidth: 92,
-    height: 36,
+  title: { fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
+  gameCount: { fontSize: 12, marginTop: 2 },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  addBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  searchRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  searchWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 42,
+  },
+  searchInput: { flex: 1, fontSize: 14 },
+  filterToggleBtn: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: themeColors.glassBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
+  filterPanel: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 10,
+    gap: 4,
   },
-  controlSection: {
-    marginBottom: 12,
-  },
-  controlTitle: {
-    color: themeColors.textMuted,
-    fontSize: 12,
+  filterSectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    paddingHorizontal: 20,
-    marginBottom: 8,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: 6,
   },
-  controlList: {
-    paddingHorizontal: 20,
-    gap: 8,
-    paddingRight: 28,
-  },
-  controlChip: {
-    height: 34,
+  chipScroll: { marginBottom: 4 },
+  chipRow: { flexDirection: 'row', gap: 6, flexWrap: 'nowrap' },
+  chip: {
     paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: themeColors.glassBorder,
-    backgroundColor: themeColors.glass,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  controlChipActive: {
-    backgroundColor: themeColors.accent + '18',
-    borderColor: themeColors.accent + '55',
+  chipText: { fontSize: 12, fontWeight: '600' },
+  activeChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  activeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  activeChipText: { fontSize: 11, fontWeight: '700' },
+  clearBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
+  clearBtnText: { fontSize: 11, fontWeight: '600' },
+  tabScroller: { marginBottom: 4 },
+  tabList: { gap: 6, paddingVertical: 4 },
+  tab: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  shortChipActive: {
-    backgroundColor: themeColors.teal + '12',
-    borderColor: themeColors.teal + '55',
-  },
-  controlChipText: {
-    color: themeColors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  controlChipTextActive: {
-    color: themeColors.textPrimary,
-  },
-  list: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 100,
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 60,
-    gap: 10,
-  },
-  emptyText: {
-    color: themeColors.textMuted,
-    fontSize: 15,
-  },
+  tabText: { fontSize: 12, fontWeight: '700' },
+  listContent: { paddingHorizontal: 16, paddingBottom: 120, paddingTop: 8 },
+  empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: '700' },
+  emptySubtitle: { fontSize: 13, textAlign: 'center', maxWidth: 260, lineHeight: 18 },
 });

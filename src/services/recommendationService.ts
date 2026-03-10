@@ -161,6 +161,11 @@ export function recordVersusChoice(recommendation: Recommendation): void {
   };
 
   writeJsonSetting(PREFERENCES_KEY, next);
+  const eventsCount = getPreferenceEventsCount() + 1;
+  setSetting(AI_PREFERENCE_EVENTS_KEY, String(eventsCount));
+  if (eventsCount >= 3) {
+    markAiProfileInitialized();
+  }
   rememberRecommendationShown(recommendation.game.id);
 }
 
@@ -301,11 +306,15 @@ export function getWeeklyPlan(hoursPerWeek: number = 7): WeeklyPlan {
   };
 }
 
-export function getVersusPair(): VersusPair | null {
-  const closer = getRecommendations({ mood: 'finish', limit: 3, avoidRecent: false })[0];
-  const lighter = getRecommendations({ mood: 'short', goal: 'bite_size', limit: 4, avoidRecent: false }).find(
-    (item) => item.game.id !== closer?.game.id
-  );
+export function getVersusPair(excludeGameIds: number[] = []): VersusPair | null {
+  const closerPool = getRecommendations({ mood: 'finish', limit: 8, avoidRecent: false, excludeGameIds })
+    .filter((item) => !excludeGameIds.includes(item.game.id));
+  const closer = closerPool[Math.floor(Math.random() * Math.min(3, closerPool.length))];
+
+  const excludeForLighter = closer ? [...excludeGameIds, closer.game.id] : excludeGameIds;
+  const lighterPool = getRecommendations({ mood: 'short', goal: 'bite_size', limit: 10, avoidRecent: false, excludeGameIds: excludeForLighter })
+    .filter((item) => !excludeForLighter.includes(item.game.id));
+  const lighter = lighterPool[Math.floor(Math.random() * Math.min(3, lighterPool.length))];
 
   if (!closer || !lighter) {
     return null;
@@ -341,6 +350,33 @@ export function getRecentCompletionCelebration(): CompletionCelebration | null {
   return getDaysBetween(value.dateKey) <= 7 ? value : null;
 }
 
+// ─── AI Preview State ─────────────────────────────────────────────────────────
+
+const AI_PREVIEW_COUNT_KEY = 'ai_preview_count';
+const AI_PREVIEW_INITIALIZED_KEY = 'ai_profile_initialized';
+const AI_PREFERENCE_EVENTS_KEY = 'ai_preference_events_count';
+
+export function getAiPreviewCount(): number {
+  return parseInt(getSetting(AI_PREVIEW_COUNT_KEY) || '0', 10);
+}
+
+export function incrementAiPreviewCount(): void {
+  const count = getAiPreviewCount() + 1;
+  setSetting(AI_PREVIEW_COUNT_KEY, String(count));
+}
+
+export function isAiProfileInitialized(): boolean {
+  return getSetting(AI_PREVIEW_INITIALIZED_KEY) === 'true';
+}
+
+export function markAiProfileInitialized(): void {
+  setSetting(AI_PREVIEW_INITIALIZED_KEY, 'true');
+}
+
+export function getPreferenceEventsCount(): number {
+  return parseInt(getSetting(AI_PREFERENCE_EVENTS_KEY) || '0', 10);
+}
+
 function buildRecommendations(games: Game[], request: RecommendationRequest = {}): Recommendation[] {
   const {
     availableTimeHours,
@@ -355,19 +391,16 @@ function buildRecommendations(games: Game[], request: RecommendationRequest = {}
   const recentIds = avoidRecent ? getRecentRecommendationIds() : [];
   const blockedIds = [...excludeGameIds, ...recentIds].filter((value, index, array) => array.indexOf(value) === index);
 
-  const candidates = games
-    .filter((game) => !blockedIds.includes(game.id))
-    .filter((game) => matchesMode(game, mode))
-    .filter((game) => matchesSession(game, availableTimeHours));
+  const candidates = shuffleArray(
+    games
+      .filter((game) => !blockedIds.includes(game.id))
+      .filter((game) => matchesMode(game, mode))
+      .filter((game) => matchesSession(game, availableTimeHours))
+  );
 
   const scored = candidates
     .map((game) => scoreGame(game, { availableTimeHours, mode, mood, goal }))
-    .sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return a.game.title.localeCompare(b.game.title);
-    });
+    .sort((a, b) => b.score - a.score);
 
   const fallbackCandidates =
     scored.length > 0
@@ -389,7 +422,8 @@ function buildRecommendations(games: Game[], request: RecommendationRequest = {}
 
   return top.map((item) => ({
     ...item,
-    match: clamp(Math.round((item.score / maxScore) * 100), 55, 100),
+    match: maxScore > 0 ? clamp(Math.round((item.score / maxScore) * 100), 0, 100) : 0,
+    confidence: (maxScore >= 80 ? 'high' : maxScore >= 40 ? 'medium' : 'low') as 'low' | 'medium' | 'high',
     whyNot: item.game.id === leader.game.id ? undefined : buildWhyNot(item, leader),
     badges: buildBadges(item),
   }));
@@ -431,6 +465,7 @@ function scoreGame(
     game,
     score: Math.round(score),
     match: 0,
+    confidence: 'low' as 'low' | 'medium' | 'high',
     highlights: highlights.slice(0, 3),
     reason: highlights.slice(0, 3).join(' • '),
     whyNot: undefined,
@@ -708,7 +743,7 @@ function buildWhyNot(item: Recommendation, leader: Recommendation): string {
 }
 
 function buildBadges(item: Recommendation): string[] {
-  const badges = [`${item.match}% fit`];
+  const badges = [item.confidence === 'low' ? 'Low confidence' : `${item.match}% fit`];
   if (item.sessionsToFinish !== null) {
     badges.push(`${item.sessionsToFinish} sessions`);
   }
@@ -782,4 +817,13 @@ function clamp(value: number, min: number, max: number): number {
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }

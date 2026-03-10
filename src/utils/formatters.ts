@@ -83,6 +83,27 @@ export function steamCoverUrl(appId: number): string {
 }
 
 /**
+ * Build a GOG cover image URL from the image slug returned by the API.
+ */
+export function gogCoverUrl(imageSlug: string): string {
+  if (!imageSlug) return '';
+  const slug = imageSlug.replace(/^\/\//, 'https://');
+  return slug.startsWith('http') ? `${slug}_392.jpg` : `https:${slug}_392.jpg`;
+}
+
+/**
+ * Extract the best cover image from Epic's keyImages array.
+ */
+export function epicCoverUrl(keyImages: Array<{ type: string; url: string }>): string {
+  const preferred = ['DieselStoreFrontWide', 'OfferImageWide', 'DieselGameBoxTall', 'Thumbnail'];
+  for (const type of preferred) {
+    const img = keyImages.find((ki) => ki.type === type);
+    if (img?.url) return img.url;
+  }
+  return keyImages[0]?.url ?? '';
+}
+
+/**
  * Calculate a rough progress emoji.
  */
 export function progressEmoji(pct: number): string {

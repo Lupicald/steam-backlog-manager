@@ -7,6 +7,7 @@ import {
     Switch,
     ActivityIndicator,
     TouchableOpacity,
+    Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { GlassCard } from '../../src/components/GlassCard';
 import { SectionHeader } from '../../src/components/SectionHeader';
 import { GameCard } from '../../src/components/GameCard';
 import { useAppContext } from '../../src/hooks/useAppContext';
+import { t } from '../../src/i18n';
 import {
     BacklogMission,
     DailyPick,
@@ -35,34 +37,57 @@ import {
     getVersusPair,
     getWeeklyPlan,
     recordVersusChoice,
+    isAiProfileInitialized,
 } from '../../src/services/recommendationService';
+import {
+    isDailyAiLimitReached,
+    incrementDailyAiPicks,
+    getDailyAiPicksUsed,
+    AI_DAILY_LIMIT,
+} from '../../src/hooks/useLimits';
+import { usePremium } from '../../src/hooks/usePremium';
+import { trackEvent } from '../../src/services/analyticsService';
+import PaywallScreen from '../../src/screens/PaywallScreen';
 
-const SESSION_OPTIONS = [
-    { label: 'Any', value: undefined },
-    { label: '1h', value: 1 },
-    { label: '2h', value: 2 },
-    { label: '4h', value: 4 },
-];
+import { Language } from '../../src/i18n';
 
-const MOOD_OPTIONS: { label: string; value: RecommendationMood }[] = [
-    { label: 'Balanced', value: 'balanced' },
-    { label: 'Advance', value: 'advance' },
-    { label: 'Short', value: 'short' },
-    { label: 'Chill', value: 'chill' },
-    { label: 'Resume', value: 'resume' },
-    { label: 'Finish', value: 'finish' },
-];
+function getMoodOptions(lang: Language): { label: string; value: RecommendationMood }[] {
+    return [
+        { label: t('ai_mood_balanced', lang), value: 'balanced' },
+        { label: t('ai_mood_advance', lang), value: 'advance' },
+        { label: t('ai_mood_short', lang), value: 'short' },
+        { label: t('ai_mood_chill', lang), value: 'chill' },
+        { label: t('ai_mood_resume', lang), value: 'resume' },
+        { label: t('ai_mood_finish', lang), value: 'finish' },
+    ];
+}
 
-const GOAL_OPTIONS: { label: string; value: RecommendationGoal }[] = [
-    { label: 'Any Goal', value: 'none' },
-    { label: 'Finish Today', value: 'finish_today' },
-    { label: '1-2 Sessions', value: 'two_sessions' },
-    { label: 'Bite Size', value: 'bite_size' },
-];
+function getSessionOptions(lang: Language): { label: string; value: number | undefined }[] {
+    return [
+        { label: t('ai_session_any', lang), value: undefined },
+        { label: t('ai_session_1h', lang), value: 1 },
+        { label: t('ai_session_2h', lang), value: 2 },
+        { label: t('ai_session_4h', lang), value: 4 },
+    ];
+}
+
+function getGoalOptions(lang: Language): { label: string; value: RecommendationGoal }[] {
+    return [
+        { label: t('ai_goal_any', lang), value: 'none' },
+        { label: t('ai_goal_finish_today', lang), value: 'finish_today' },
+        { label: t('ai_goal_2sessions', lang), value: 'two_sessions' },
+        { label: t('ai_goal_bite', lang), value: 'bite_size' },
+    ];
+}
 
 export default function RecommendationsScreen() {
     const router = useRouter();
-    const { themeColors } = useAppContext();
+    const { themeColors, isPremium } = useAppContext();
+    const { language = 'en' } = useAppContext() as any;
+    const { purchaseProduct } = usePremium();
+    const MOOD_OPTIONS = getMoodOptions(language as Language);
+    const SESSION_OPTIONS = getSessionOptions(language as Language);
+    const GOAL_OPTIONS = getGoalOptions(language as Language);
     const [focusMode, setFocusMode] = useState(false);
     const [sessionHours, setSessionHours] = useState<number | undefined>(undefined);
     const [mood, setMood] = useState<RecommendationMood>('balanced');
@@ -75,53 +100,231 @@ export default function RecommendationsScreen() {
     const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan | null>(null);
     const [versus, setVersus] = useState<VersusPair | null>(null);
     const [loading, setLoading] = useState(true);
+    const [versusSelected, setVersusSelected] = useState<number | null>(null);
+    const [versusMsg, setVersusMsg] = useState('');
+    const versusShownIds = React.useRef<number[]>([]);
+    const [profileInitialized, setProfileInitialized] = useState(false);
+    // Daily limit: re-read on every render so it reflects midnight resets.
+    const dailyUsed = getDailyAiPicksUsed();
+    const limitReached = !isPremium && isDailyAiLimitReached();
+    const [paywallVisible, setPaywallVisible] = useState(false);
 
     useFocusEffect(
         React.useCallback(() => {
             loadData();
-        }, [focusMode, sessionHours, mood, goal])
+        }, [isPremium])
     );
 
     const loadData = () => {
+        if (limitReached) {
+            setPaywallVisible(true);
+            return;
+        }
         setLoading(true);
+        setVersusSelected(null);
+        setVersusMsg('');
+        versusShownIds.current = [];
+        setProfileInitialized(isAiProfileInitialized());
         setRecs(
             getRecommendations({
                 mode: focusMode ? 'focus' : 'balanced',
                 availableTimeHours: sessionHours,
                 mood,
                 goal,
-                limit: 6,
+                limit: isPremium ? 6 : AI_DAILY_LIMIT,
             })
         );
         setDailyPick(getDailyPick());
-        setMissions(getBacklogMissions());
-        setCollections(getSmartCollections());
-        setTasteProfile(getTasteProfile());
-        setWeeklyPlan(getWeeklyPlan(sessionHours ? sessionHours * 4 : 7));
-        setVersus(getVersusPair());
+        if (isPremium) {
+            setMissions(getBacklogMissions());
+            setCollections(getSmartCollections());
+            setTasteProfile(getTasteProfile());
+            setWeeklyPlan(getWeeklyPlan(sessionHours ? sessionHours * 4 : 7));
+            const firstPair = getVersusPair([]);
+            if (firstPair) {
+                versusShownIds.current = [firstPair.left.game.id, firstPair.right.game.id];
+            }
+            setVersus(firstPair);
+        }
+        if (!isPremium) {
+            incrementDailyAiPicks();
+            trackEvent('ai_pick_used');
+        }
         setLoading(false);
     };
 
     const pickVersus = (rec: Recommendation) => {
         recordVersusChoice(rec);
-        loadData();
+        setVersusSelected(rec.game.id);
+        setVersusMsg(t('ai_versus_learned', language as Language));
+        setTimeout(() => {
+            setVersusSelected(null);
+            setVersusMsg('');
+            const nextPair = getVersusPair(versusShownIds.current);
+            if (nextPair) {
+                versusShownIds.current = [...versusShownIds.current, nextPair.left.game.id, nextPair.right.game.id];
+            }
+            setVersus(nextPair);
+        }, 1200);
     };
+
+    const previewRecs = isPremium ? recs : recs.slice(0, AI_DAILY_LIMIT);
 
     return (
         <View style={[styles.root, { backgroundColor: themeColors.bg }]}>
             <LinearGradient colors={[themeColors.bg, themeColors.card]} style={StyleSheet.absoluteFill} />
 
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+                {/* Header */}
                 <View style={styles.header}>
-                    <Text style={[styles.title, { color: themeColors.textPrimary }]}>AI Picker</Text>
+                    <Text style={[styles.title, { color: themeColors.textPrimary }]}>{t('ai_title', language as Language)}</Text>
                     <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
-                        Intent-driven picks, daily hooks, missions and smart backlog routes
+                        {isPremium
+                            ? t('ai_subtitle_premium', language as Language)
+                            : t('ai_subtitle_free', language as Language)}
                     </Text>
                 </View>
 
-                {dailyPick && (
+                {/* Intent filters (always visible) */}
+                <View style={styles.section}>
+                    <GlassCard padding={20} style={styles.focusSwitchCard}>
+                        <View style={styles.focusTextWrap}>
+                            <Text style={[styles.focusTitle, { color: themeColors.textPrimary }]}>{t('ai_focus_mode', language as Language)}</Text>
+                            <Text style={[styles.focusSubtitle, { color: themeColors.textMuted }]}>
+                                {t('ai_focus_desc', language as Language)}
+                            </Text>
+                        </View>
+                        <Switch
+                            value={focusMode}
+                            onValueChange={setFocusMode}
+                            trackColor={{ false: themeColors.glassBorder, true: themeColors.accent }}
+                            thumbColor={themeColors.textPrimary}
+                        />
+                    </GlassCard>
+                </View>
+
+                <View style={styles.section}>
+                    <GlassCard padding={20}>
+                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>{t('ai_mood', language as Language)}</Text>
+                        <View style={styles.sessionChips}>
+                            {MOOD_OPTIONS.map((option) => {
+                                const active = mood === option.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        style={[
+                                            styles.sessionChip,
+                                            {
+                                                backgroundColor: active ? themeColors.accent : themeColors.card,
+                                                borderColor: active ? themeColors.accent : themeColors.glassBorder,
+                                            },
+                                        ]}
+                                        onPress={() => setMood(option.value)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </GlassCard>
+                </View>
+
+                <View style={styles.section}>
+                    <GlassCard padding={20}>
+                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>{t('ai_session', language as Language)}</Text>
+                        <View style={styles.sessionChips}>
+                            {SESSION_OPTIONS.map((option) => {
+                                const active = sessionHours === option.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={option.label}
+                                        style={[
+                                            styles.sessionChip,
+                                            {
+                                                backgroundColor: active ? themeColors.violet : themeColors.card,
+                                                borderColor: active ? themeColors.violet : themeColors.glassBorder,
+                                            },
+                                        ]}
+                                        onPress={() => setSessionHours(option.value)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </GlassCard>
+                </View>
+
+                <View style={styles.section}>
+                    <GlassCard padding={20}>
+                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>{t('ai_goal', language as Language)}</Text>
+                        <View style={styles.sessionChips}>
+                            {GOAL_OPTIONS.map((option) => {
+                                const active = goal === option.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        style={[
+                                            styles.sessionChip,
+                                            {
+                                                backgroundColor: active ? themeColors.teal : themeColors.card,
+                                                borderColor: active ? themeColors.teal : themeColors.glassBorder,
+                                            },
+                                        ]}
+                                        onPress={() => setGoal(option.value)}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
+                                            {option.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </GlassCard>
+                </View>
+
+                {limitReached ? (
+                    <TouchableOpacity
+                        style={[styles.applyBtn, { backgroundColor: themeColors.accent }]}
+                        onPress={() => setPaywallVisible(true)}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="lock-closed" size={16} color="#fff" />
+                        <Text style={styles.applyBtnText}>{t('ai_paywall_title', language as Language)}</Text>
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.applyBtn, { backgroundColor: themeColors.accent }]}
+                        onPress={loadData}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="sparkles" size={16} color="#fff" />
+                        <Text style={styles.applyBtnText}>
+                            {t('ai_get_picks', language as Language)}
+                            {!isPremium ? `  (${AI_DAILY_LIMIT - dailyUsed} left)` : ''}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Paywall modal — full branded screen */}
+                <Modal visible={paywallVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaywallVisible(false)}>
+                    <PaywallScreen
+                        onClose={() => setPaywallVisible(false)}
+                        triggerMessage={`You've used your ${AI_DAILY_LIMIT} free AI picks for today. Come back tomorrow or go Premium for unlimited picks.`}
+                    />
+                </Modal>
+
+                {/* Premium: Daily Pick */}
+                {isPremium && dailyPick && (
                     <View style={styles.section}>
-                        <SectionHeader title="Daily Pick" icon="flash" iconColor={themeColors.teal} />
+                        <SectionHeader title={t('ai_daily_pick', language as Language)} icon="flash" iconColor={themeColors.teal} />
                         <TouchableOpacity onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)} activeOpacity={0.82}>
                             <GlassCard padding={18} radius={20} borderColor={themeColors.teal} style={{ overflow: 'hidden' }}>
                                 <LinearGradient
@@ -154,9 +357,105 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {tasteProfile && (
+                {/* Top Picks */}
+                <View style={styles.section}>
+                    <SectionHeader title={isPremium ? t('ai_top_picks', language as Language) : t('ai_free_picks', language as Language)} icon="sparkles" iconColor={themeColors.orange} />
+
+                    {loading ? (
+                        <ActivityIndicator size="large" color={themeColors.orange} style={{ marginTop: 40 }} />
+                    ) : previewRecs.length === 0 ? (
+                        <GlassCard padding={20}>
+                            <Text style={{ color: themeColors.textMuted, textAlign: 'center' }}>
+                                {t('ai_no_games', language as Language)}
+                            </Text>
+                        </GlassCard>
+                    ) : (
+                        previewRecs.map((rec) => (
+                            <View key={rec.game.id} style={styles.recWrapper}>
+                                <View style={[styles.reasonCard, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
+                                    <Ionicons name="sparkles" size={14} color={themeColors.violet} />
+                                    <View style={styles.reasonContent}>
+                                        <View style={styles.badgeRow}>
+                                            {rec.badges.map((badge) => {
+                                                const isLowConf = badge === 'Low confidence';
+                                                return (
+                                                    <View
+                                                        key={badge}
+                                                        style={[
+                                                            styles.smallBadge,
+                                                            isLowConf
+                                                                ? { borderColor: themeColors.orange + '55', backgroundColor: themeColors.orange + '12' }
+                                                                : { borderColor: themeColors.accent + '55', backgroundColor: themeColors.accent + '12' },
+                                                        ]}
+                                                    >
+                                                        <Text style={[styles.smallBadgeText, { color: isLowConf ? themeColors.orange : themeColors.accent }]}>
+                                                            {badge}
+                                                        </Text>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                        <Text style={[styles.reasonText, { color: themeColors.textPrimary }]}>
+                                            {rec.reason}
+                                        </Text>
+                                        {rec.whyNot ? (
+                                            <Text style={[styles.whyNotText, { color: themeColors.textMuted }]}>
+                                                {t('ai_why_not', language as Language)} {rec.whyNot}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                </View>
+                                <GameCard game={rec.game} />
+                            </View>
+                        ))
+                    )}
+                </View>
+
+                {/* Paywall card for free users */}
+                {!isPremium && (
                     <View style={styles.section}>
-                        <SectionHeader title="Taste Profile" icon="sparkles" iconColor={themeColors.orange} />
+                        <GlassCard padding={24} borderColor={themeColors.accent} style={{ overflow: 'hidden' }}>
+                            <LinearGradient
+                                colors={[themeColors.accent + '22', 'transparent']}
+                                style={StyleSheet.absoluteFill}
+                            />
+                            <View style={styles.paywallHeader}>
+                                <Ionicons name="star" size={28} color={themeColors.accent} />
+                                <Text style={[styles.paywallTitle, { color: themeColors.textPrimary }]}>
+                                    {t('ai_paywall_title', language as Language)}
+                                </Text>
+                            </View>
+                            <Text style={[styles.paywallSubtitle, { color: themeColors.textSecondary }]}>
+                                {t('ai_paywall_subtitle', language as Language)}
+                            </Text>
+                            {[
+                                t('ai_benefit_unlimited', language as Language),
+                                t('ai_benefit_profile', language as Language),
+                                t('ai_benefit_versus', language as Language),
+                                t('ai_benefit_collections', language as Language),
+                                t('ai_benefit_plan', language as Language),
+                                t('ai_benefit_daily', language as Language),
+                            ].map((benefit) => (
+                                <View key={benefit} style={styles.benefitRow}>
+                                    <Ionicons name="checkmark-circle" size={16} color={themeColors.accent} />
+                                    <Text style={[styles.benefitText, { color: themeColors.textSecondary }]}>{benefit}</Text>
+                                </View>
+                            ))}
+                            <TouchableOpacity
+                                style={[styles.paywallBtn, { backgroundColor: themeColors.accent }]}
+                                onPress={() => setPaywallVisible(true)}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={styles.paywallBtnText}>{t('ai_subscribe', language as Language)}</Text>
+                            </TouchableOpacity>
+                        </GlassCard>
+                    </View>
+                )}
+
+                {/* Premium: Taste Profile */}
+                {isPremium && tasteProfile && profileInitialized && (
+                    <View style={styles.section}>
+                        <SectionHeader title={t('ai_taste_profile', language as Language)} icon="person" iconColor={themeColors.orange} />
                         <GlassCard padding={18}>
                             <Text style={[styles.profileTitle, { color: themeColors.textPrimary }]}>{tasteProfile.title}</Text>
                             <Text style={[styles.profileSummary, { color: themeColors.textSecondary }]}>{tasteProfile.summary}</Text>
@@ -171,160 +470,75 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                <View style={styles.section}>
-                    <GlassCard padding={20} style={styles.focusSwitchCard}>
-                        <View style={styles.focusTextWrap}>
-                            <Text style={[styles.focusTitle, { color: themeColors.textPrimary }]}>Focus Mode</Text>
-                            <Text style={[styles.focusSubtitle, { color: themeColors.textMuted }]}>
-                                Prefer shorter games you can close faster
-                            </Text>
-                        </View>
-                        <Switch
-                            value={focusMode}
-                            onValueChange={setFocusMode}
-                            trackColor={{ false: themeColors.glassBorder, true: themeColors.accent }}
-                            thumbColor={themeColors.textPrimary}
-                        />
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <GlassCard padding={20}>
-                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>Mood / Intent</Text>
-                        <View style={styles.sessionChips}>
-                            {MOOD_OPTIONS.map((option) => {
-                                const active = mood === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.value}
-                                        style={[
-                                            styles.sessionChip,
-                                            {
-                                                backgroundColor: active ? themeColors.accent : themeColors.card,
-                                                borderColor: active ? themeColors.accent : themeColors.glassBorder,
-                                            },
-                                        ]}
-                                        onPress={() => setMood(option.value)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <GlassCard padding={20}>
-                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>Session Goal</Text>
-                        <View style={styles.sessionChips}>
-                            {GOAL_OPTIONS.map((option) => {
-                                const active = goal === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.value}
-                                        style={[
-                                            styles.sessionChip,
-                                            {
-                                                backgroundColor: active ? themeColors.orange : themeColors.card,
-                                                borderColor: active ? themeColors.orange : themeColors.glassBorder,
-                                            },
-                                        ]}
-                                        onPress={() => setGoal(option.value)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <GlassCard padding={20}>
-                        <Text style={[styles.filterLabel, { color: themeColors.textMuted }]}>Session Time</Text>
-                        <View style={styles.sessionChips}>
-                            {SESSION_OPTIONS.map((option) => {
-                                const active = sessionHours === option.value;
-                                return (
-                                    <TouchableOpacity
-                                        key={option.label}
-                                        style={[
-                                            styles.sessionChip,
-                                            {
-                                                backgroundColor: active ? themeColors.violet : themeColors.card,
-                                                borderColor: active ? themeColors.violet : themeColors.glassBorder,
-                                            },
-                                        ]}
-                                        onPress={() => setSessionHours(option.value)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={[styles.sessionChipText, { color: active ? '#fff' : themeColors.textPrimary }]}>
-                                            {option.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                {missions.length > 0 && (
+                {isPremium && tasteProfile && !profileInitialized && (
                     <View style={styles.section}>
-                        <SectionHeader title="Backlog Missions" icon="flag" iconColor={themeColors.green} />
-                        {missions.map((mission) => (
-                            <TouchableOpacity
-                                key={mission.id}
-                                activeOpacity={mission.gameId ? 0.82 : 1}
-                                onPress={() => mission.gameId ? router.push(`/game/${mission.gameId}`) : undefined}
-                            >
-                                <GlassCard padding={16} style={styles.missionCard}>
-                                    <Text style={[styles.missionTitle, { color: themeColors.textPrimary }]}>{mission.title}</Text>
-                                    <Text style={[styles.missionDesc, { color: themeColors.textSecondary }]}>{mission.description}</Text>
-                                </GlassCard>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-
-                {versus && (
-                    <View style={styles.section}>
-                        <SectionHeader title="Versus Picker" icon="git-compare" iconColor={themeColors.accent} />
+                        <SectionHeader title={t('ai_taste_profile', language as Language)} icon="person" iconColor={themeColors.orange} />
                         <GlassCard padding={18}>
-                            <Text style={[styles.versusPrompt, { color: themeColors.textPrimary }]}>{versus.prompt}</Text>
-                            <View style={styles.versusRow}>
-                                {[versus.left, versus.right].map((rec) => (
-                                    <TouchableOpacity
-                                        key={rec.game.id}
-                                        style={[styles.versusCard, { borderColor: themeColors.glassBorder, backgroundColor: themeColors.card }]}
-                                        onPress={() => pickVersus(rec)}
-                                        activeOpacity={0.82}
-                                    >
-                                        <Text style={[styles.versusTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
-                                            {rec.game.title}
-                                        </Text>
-                                        <Text style={[styles.versusReason, { color: themeColors.textSecondary }]} numberOfLines={3}>
-                                            {rec.reason}
-                                        </Text>
-                                        <View style={[styles.pickButton, { backgroundColor: themeColors.accent }]}>
-                                            <Text style={styles.pickButtonText}>Pick This</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
+                            <View style={styles.buildProfileRow}>
+                                <Ionicons name="bar-chart-outline" size={20} color={themeColors.orange} />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.profileTitle, { color: themeColors.textPrimary }]}>{t('ai_build_profile', language as Language)}</Text>
+                                    <Text style={[styles.profileSummary, { color: themeColors.textSecondary }]}>
+                                        {t('ai_build_profile_desc', language as Language)}
+                                    </Text>
+                                </View>
                             </View>
                         </GlassCard>
                     </View>
                 )}
 
-                {collections.length > 0 && (
+                {/* Premium: Versus Picker */}
+                {isPremium && versus && (
                     <View style={styles.section}>
-                        <SectionHeader title="Smart Collections" icon="albums" iconColor={themeColors.blue} />
+                        <SectionHeader title={t('ai_versus', language as Language)} icon="git-compare" iconColor={themeColors.accent} />
+                        <GlassCard padding={18}>
+                            <Text style={[styles.versusPrompt, { color: themeColors.textPrimary }]}>{t('ai_versus_prompt', language as Language)}</Text>
+                            {versusMsg ? (
+                                <View style={[styles.versusMsg, { backgroundColor: themeColors.accent + '22' }]}>
+                                    <Ionicons name="checkmark-circle" size={16} color={themeColors.accent} />
+                                    <Text style={[styles.versusMsgText, { color: themeColors.accent }]}>{versusMsg}</Text>
+                                </View>
+                            ) : null}
+                            <View style={styles.versusRow}>
+                                {[versus.left, versus.right].map((rec) => {
+                                    const isSelected = versusSelected === rec.game.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={rec.game.id}
+                                            style={[
+                                                styles.versusCard,
+                                                {
+                                                    borderColor: isSelected ? themeColors.accent : themeColors.glassBorder,
+                                                    backgroundColor: isSelected ? themeColors.accent + '18' : themeColors.card,
+                                                },
+                                            ]}
+                                            onPress={() => pickVersus(rec)}
+                                            activeOpacity={0.82}
+                                            disabled={versusSelected !== null}
+                                        >
+                                            <Text style={[styles.versusTitle, { color: themeColors.textPrimary }]} numberOfLines={2}>
+                                                {rec.game.title}
+                                            </Text>
+                                            <Text style={[styles.versusReason, { color: themeColors.textSecondary }]} numberOfLines={3}>
+                                                {rec.reason}
+                                            </Text>
+                                            <View style={[styles.pickButton, { backgroundColor: isSelected ? themeColors.accent : themeColors.accent + '22' }]}>
+                                                <Text style={[styles.pickButtonText, { color: isSelected ? '#fff' : themeColors.accent }]}>
+                                                    {isSelected ? t('ai_versus_picked', language as Language) : t('ai_versus_pick', language as Language)}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </GlassCard>
+                    </View>
+                )}
+
+                {/* Premium: Smart Collections */}
+                {isPremium && collections.length > 0 && (
+                    <View style={styles.section}>
+                        <SectionHeader title={t('ai_smart_collections', language as Language)} icon="albums" iconColor={themeColors.blue} />
                         {collections.map((collection) => (
                             <GlassCard key={collection.id} padding={18} style={styles.collectionCard}>
                                 <Text style={[styles.collectionTitle, { color: themeColors.textPrimary }]}>{collection.title}</Text>
@@ -344,9 +558,10 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                {weeklyPlan && weeklyPlan.items.length > 0 && (
+                {/* Premium: Weekly Plan */}
+                {isPremium && weeklyPlan && weeklyPlan.items.length > 0 && (
                     <View style={styles.section}>
-                        <SectionHeader title="Weekly Plan" icon="calendar" iconColor={themeColors.violet} />
+                        <SectionHeader title={t('ai_weekly_plan', language as Language)} icon="calendar" iconColor={themeColors.violet} />
                         <GlassCard padding={18}>
                             <Text style={[styles.planSummary, { color: themeColors.textSecondary }]}>{weeklyPlan.summary}</Text>
                             {weeklyPlan.items.map((item) => (
@@ -366,45 +581,24 @@ export default function RecommendationsScreen() {
                     </View>
                 )}
 
-                <View style={styles.section}>
-                    <SectionHeader title="Top Picks" icon="sparkles" iconColor={themeColors.orange} />
-
-                    {loading ? (
-                        <ActivityIndicator size="large" color={themeColors.orange} style={{ marginTop: 40 }} />
-                    ) : recs.length === 0 ? (
-                        <GlassCard padding={20}>
-                            <Text style={{ color: themeColors.textMuted, textAlign: 'center' }}>
-                                Not enough games in your backlog to make recommendations.
-                            </Text>
-                        </GlassCard>
-                    ) : (
-                        recs.map((rec) => (
-                            <View key={rec.game.id} style={styles.recWrapper}>
-                                <View style={[styles.reasonCard, { backgroundColor: themeColors.card, borderColor: themeColors.glassBorder }]}>
-                                    <Ionicons name="sparkles" size={14} color={themeColors.violet} />
-                                    <View style={styles.reasonContent}>
-                                        <View style={styles.badgeRow}>
-                                            {rec.badges.map((badge) => (
-                                                <View key={badge} style={[styles.smallBadge, { borderColor: themeColors.accent + '55', backgroundColor: themeColors.accent + '12' }]}>
-                                                    <Text style={[styles.smallBadgeText, { color: themeColors.accent }]}>{badge}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-                                        <Text style={[styles.reasonText, { color: themeColors.textPrimary }]}>
-                                            {rec.reason}
-                                        </Text>
-                                        {rec.whyNot ? (
-                                            <Text style={[styles.whyNotText, { color: themeColors.textMuted }]}>
-                                                Why not #1: {rec.whyNot}
-                                            </Text>
-                                        ) : null}
-                                    </View>
-                                </View>
-                                <GameCard game={rec.game} />
-                            </View>
-                        ))
-                    )}
-                </View>
+                {/* Premium: Backlog Missions */}
+                {isPremium && missions.length > 0 && (
+                    <View style={styles.section}>
+                        <SectionHeader title={t('ai_missions', language as Language)} icon="flag" iconColor={themeColors.green} />
+                        {missions.map((mission) => (
+                            <TouchableOpacity
+                                key={mission.id}
+                                activeOpacity={mission.gameId ? 0.82 : 1}
+                                onPress={() => mission.gameId ? router.push(`/game/${mission.gameId}`) : undefined}
+                            >
+                                <GlassCard padding={16} style={styles.missionCard}>
+                                    <Text style={[styles.missionTitle, { color: themeColors.textPrimary }]}>{mission.title}</Text>
+                                    <Text style={[styles.missionDesc, { color: themeColors.textSecondary }]}>{mission.description}</Text>
+                                </GlassCard>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
 
                 <View style={{ height: 120 }} />
             </ScrollView>
@@ -426,6 +620,7 @@ const styles = StyleSheet.create({
     dailyStreak: { fontSize: 12, fontWeight: '800', marginTop: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
     profileTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6 },
     profileSummary: { fontSize: 13, lineHeight: 19, marginBottom: 12 },
+    buildProfileRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
     focusSwitchCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     focusTextWrap: { flex: 1 },
     focusTitle: { fontSize: 16, fontWeight: '700' },
@@ -441,12 +636,14 @@ const styles = StyleSheet.create({
     missionTitle: { fontSize: 15, fontWeight: '800', marginBottom: 5 },
     missionDesc: { fontSize: 13, lineHeight: 19 },
     versusPrompt: { fontSize: 16, fontWeight: '800', marginBottom: 14 },
+    versusMsg: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, padding: 10, marginBottom: 12 },
+    versusMsgText: { fontSize: 13, fontWeight: '700' },
     versusRow: { flexDirection: 'row', gap: 12 },
     versusCard: { flex: 1, borderWidth: 1, borderRadius: 16, padding: 14 },
     versusTitle: { fontSize: 15, fontWeight: '800', marginBottom: 8 },
     versusReason: { fontSize: 12, lineHeight: 18, marginBottom: 14 },
     pickButton: { height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    pickButtonText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+    pickButtonText: { fontSize: 12, fontWeight: '800' },
     collectionCard: { marginBottom: 12 },
     collectionTitle: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
     collectionDesc: { fontSize: 12, lineHeight: 18, marginBottom: 8 },
@@ -458,6 +655,8 @@ const styles = StyleSheet.create({
     planLabel: { width: 34, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
     planTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
     planNote: { fontSize: 12, lineHeight: 17 },
+    applyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: 14, marginBottom: 24 },
+    applyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
     recWrapper: { marginBottom: 20 },
     reasonCard: {
         alignSelf: 'stretch',
@@ -479,4 +678,13 @@ const styles = StyleSheet.create({
     reasonContent: { flex: 1, gap: 8 },
     reasonText: { fontSize: 12, fontWeight: '600', lineHeight: 18, flex: 1 },
     whyNotText: { fontSize: 11, lineHeight: 16 },
+    paywallHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+    paywallTitle: { fontSize: 18, fontWeight: '800', flex: 1 },
+    paywallSubtitle: { fontSize: 13, marginBottom: 14 },
+    benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    benefitText: { fontSize: 13, flex: 1 },
+    paywallBtn: { marginTop: 16, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    paywallBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+    paywallOverlay: { flex: 1, backgroundColor: '#00000088', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    paywallModal: { width: '100%', borderRadius: 24, borderWidth: 1, padding: 24, overflow: 'hidden' },
 });

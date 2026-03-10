@@ -63,37 +63,48 @@ export async function batchEnrichHLTB(
   let failed = 0;
   let lastErrorMessage: string | undefined;
 
-  for (let i = 0; i < games.length; i++) {
+  const BATCH_SIZE = 5;
+
+  for (let i = 0; i < games.length; i += BATCH_SIZE) {
     if (signal?.aborted) {
       return { enriched, notFound, failed, stoppedEarly: true, lastErrorMessage };
     }
 
-    const currentGame = games[i];
-    const result = await enrichGameWithHLTB(currentGame.id);
-    if (result.status === 'success') {
-      enriched++;
-    } else if (result.status === 'not_found') {
-      notFound++;
-    } else {
-      failed++;
-      lastErrorMessage = result.errorMessage;
+    const currentBatch = games.slice(i, i + BATCH_SIZE);
+
+    // Process the batch in parallel
+    const results = await Promise.all(
+      currentBatch.map(async (currentGame) => {
+        const res = await enrichGameWithHLTB(currentGame.id);
+        return { game: currentGame, result: res };
+      })
+    );
+
+    for (const { result } of results) {
+      if (result.status === 'success') {
+        enriched++;
+      } else if (result.status === 'not_found') {
+        notFound++;
+      } else {
+        failed++;
+        lastErrorMessage = result.errorMessage;
+      }
     }
 
     onProgress?.({
-      done: i + 1,
+      done: Math.min(i + BATCH_SIZE, games.length),
       total: games.length,
-      currentTitle: currentGame.title,
+      currentTitle: currentBatch[currentBatch.length - 1].title,
       enriched,
       notFound,
       failed,
     });
 
-    if (result.status === 'request_failed') {
+    // If any failed in the batch due to request failure, wait longer
+    if (results.some(r => r.result.status === 'request_failed')) {
       await delay(2000);
-    }
-
-    // Polite delay between requests
-    if (i < games.length - 1) {
+    } else if (i + BATCH_SIZE < games.length) {
+      // Polite delay between batches
       await delay(500);
     }
   }

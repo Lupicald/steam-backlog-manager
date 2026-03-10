@@ -1,9 +1,15 @@
 {
   "expo": {
-    "name": "GameStack",
+    "name": "BacklogFlow",
     "slug": "steam-backlog-manager",
     "version": "1.0.0",
-    "icon": "./ChatGPT Image 6 mar 2026, 11_44_17 p.m..png",
+    "runtimeVersion": "1.0.0",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d0d14"
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": [
@@ -11,27 +17,57 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.steambacklog.app"
+      "bundleIdentifier": "com.backlogflow.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera is not used by this app.",
+        "NSPhotoLibraryUsageDescription": "Photo library is not used by this app."
+      }
     },
     "android": {
-      "package": "com.steambacklog.app",
-      "versionCode": 1,
+      "package": "com.backlogflow.app",
+      "versionCode": 2,
       "adaptiveIcon": {
-        "foregroundImage": "./ChatGPT Image 6 mar 2026, 11_44_17 p.m..png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#05051a"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "backlogflow"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 26
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "steambacklog",
+    "scheme": "backlogflow",
     "extra": {
       "router": {
         "origin": false

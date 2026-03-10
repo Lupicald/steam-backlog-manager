@@ -3,6 +3,7 @@ import { BlurView } from 'expo-blur';
 import { StyleSheet, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../src/hooks/useAppContext';
+import { t } from '../../src/i18n';
 
 function TabBarBackground() {
   const { themeColors } = useAppContext();
@@ -23,7 +24,7 @@ function TabBarBackground() {
 }
 
 export default function TabLayout() {
-  const { themeColors } = useAppContext();
+  const { themeColors, language } = useAppContext();
   return (
     <Tabs
       screenOptions={{
@@ -49,7 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: t('tab_dash', language),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -58,7 +59,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Library',
+          title: t('tab_lib', language),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="library" size={size} color={color} />
           ),
@@ -67,7 +68,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="recommendations"
         options={{
-          title: 'AI Picker',
+          title: t('tab_ai', language),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="sparkles" size={size} color={color} />
           ),
@@ -76,7 +77,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="planner"
         options={{
-          title: 'Planner',
+          title: t('tab_plan', language),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
@@ -85,7 +86,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="stats"
         options={{
-          title: 'Stats',
+          title: t('tab_stats', language),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart" size={size} color={color} />
           ),
@@ -94,7 +95,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: t('tab_set', language),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings" size={size} color={color} />
           ),

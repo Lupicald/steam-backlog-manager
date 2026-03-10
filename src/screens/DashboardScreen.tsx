@@ -24,16 +24,19 @@ import { formatBacklogHours } from '../../src/utils/formatters';
 import { useAppContext } from '../../src/hooks/useAppContext';
 import { getDailyPick, getRecommendations, getRecentCompletionCelebration } from '../../src/services/recommendationService';
 import { useRouter } from 'expo-router';
-import { CompletionCelebration, DailyPick, Recommendation } from '../../src/types';
+import { CompletionCelebration, DailyPick, Game, Recommendation } from '../../src/types';
+import { t } from '../../src/i18n';
+import { SessionTimerModal } from '../../src/components/SessionTimerModal';
 
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { games, stats, refresh, setStatus, getByStatus } = useGames();
   const { recommendation, refresh: refreshRec, reroll } = useRecommendation();
-  const { themeColors, isPremium } = useAppContext();
+  const { themeColors, isPremium, language, playerName } = useAppContext();
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [timerGame, setTimerGame] = useState<Game | null>(null);
   const [topRecs, setTopRecs] = useState<Recommendation[]>([]);
   const [dailyPick, setDailyPick] = useState<DailyPick | null>(null);
   const [celebration, setCelebration] = useState<CompletionCelebration | null>(null);
@@ -86,11 +89,13 @@ export default function DashboardScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={[styles.greeting, { color: themeColors.textPrimary }]}>Steam Backlog</Text>
+            <Text style={[styles.greeting, { color: themeColors.textPrimary }]}>
+              {t('dash_greeting', language)} {playerName || t('dash_greeting_default', language)}
+            </Text>
             <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
               {stats
-                ? `${stats.total} games · ${formatBacklogHours(stats.total_hours_remaining)} remaining`
-                : 'Loading your library…'}
+                ? `${stats.total} ${t('dash_subtitle_games', language)} · ${formatBacklogHours(stats.total_hours_remaining)} ${t('dash_subtitle_remaining', language)}`
+                : t('dash_loading', language)}
             </Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -136,11 +141,11 @@ export default function DashboardScreen() {
             />
             <Ionicons name="hourglass-outline" size={20} color={themeColors.orange} />
             <Text style={[styles.bannerText, { color: themeColors.textSecondary }]}>
-              Your backlog will take{' '}
+              {t('dash_backlog_banner', language)}{' '}
               <Text style={{ color: themeColors.orange, fontWeight: '800' }}>
                 {formatBacklogHours(stats.total_hours_remaining)}
               </Text>{' '}
-              to finish
+              {t('dash_backlog_banner2', language)}
             </Text>
           </View>
         )}
@@ -148,7 +153,7 @@ export default function DashboardScreen() {
         {/* --- Premium Widget Top Row --- */}
         {dailyPick && (
           <View style={styles.section}>
-            <SectionHeader title="Daily Pick" icon="flash" iconColor={themeColors.teal} />
+            <SectionHeader title={t('dash_daily_pick', language)} icon="flash" iconColor={themeColors.teal} />
             <TouchableOpacity onPress={() => router.push(`/game/${dailyPick.recommendation.game.id}`)} activeOpacity={0.82}>
               <GlassCard padding={16} radius={18} borderColor={themeColors.teal} intensity={26} style={{ overflow: 'hidden' }}>
                 <LinearGradient
@@ -176,7 +181,7 @@ export default function DashboardScreen() {
 
         {celebration && (
           <View style={styles.section}>
-            <SectionHeader title="Recent Win" icon="trophy" iconColor={themeColors.orange} />
+            <SectionHeader title={t('dash_recent_win', language)} icon="trophy" iconColor={themeColors.orange} />
             <GlassCard padding={18} radius={18} style={{ overflow: 'hidden' }}>
               <LinearGradient
                 colors={[themeColors.orange + '20', themeColors.accent + '12']}
@@ -186,7 +191,7 @@ export default function DashboardScreen() {
                 {celebration.title} completed
               </Text>
               <Text style={[styles.celebrationText, { color: themeColors.textSecondary }]}>
-                You shaved {celebration.savedHours}h off the backlog and reached {celebration.completedCount} completed games.
+                {t('dash_shaved', language)} {celebration.savedHours}h {t('dash_off_backlog', language)} {celebration.completedCount} {t('dash_completed_games', language)}
               </Text>
             </GlassCard>
           </View>
@@ -194,7 +199,7 @@ export default function DashboardScreen() {
 
         {isPremium && topRecs.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="AI Recommended Next" icon="sparkles" iconColor={themeColors.orange} />
+            <SectionHeader title={t('dash_ai_next', language)} icon="sparkles" iconColor={themeColors.orange} />
             <TouchableOpacity onPress={() => router.push(`/game/${topRecs[0].game.id}`)} activeOpacity={0.8} style={{ position: 'relative', marginTop: 12 }}>
               <View style={[styles.premiumBadgeRow, { backgroundColor: themeColors.accent, zIndex: 10 }]}>
                 <Text style={styles.premiumBadgeText}>Match {topRecs[0].match}%</Text>
@@ -221,13 +226,13 @@ export default function DashboardScreen() {
           <View style={styles.statsGrid}>
             <View style={styles.statsRow}>
               <StatCard
-                label="Total Games"
+                label={t('stat_total', language)}
                 value={stats.total}
                 icon="library"
                 color={themeColors.accent}
               />
               <StatCard
-                label="Playing"
+                label={t('stat_playing', language)}
                 value={stats.playing}
                 icon="play-circle"
                 color={themeColors.green}
@@ -235,17 +240,17 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.statsRow}>
               <StatCard
-                label="Up Next"
+                label={t('stat_up_next', language)}
                 value={stats.up_next}
                 icon="bookmark"
                 color={themeColors.blue}
               />
               <StatCard
-                label="HLTB Met"
+                label={t('stat_hltb_met', language)}
                 value={stats.hltb_target_met}
                 icon="checkmark-done-circle"
                 color={themeColors.orange}
-                subtitle={`${stats.completed} completed`}
+                subtitle={`${stats.completed} ${t('stat_completed', language)}`}
               />
             </View>
           </View>
@@ -255,17 +260,28 @@ export default function DashboardScreen() {
         {playing.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Currently Playing"
+              title={t('dash_currently_playing', language)}
               icon="play-circle"
               iconColor={themeColors.green}
               count={playing.length}
             />
             {playing.map((g) => (
-              <GameCard
-                key={g.id}
-                game={g}
-                onStatusChange={setStatus}
-              />
+              <View key={g.id}>
+                <GameCard
+                  game={g}
+                  onStatusChange={setStatus}
+                />
+                <TouchableOpacity
+                  style={[styles.startPlayingBtn, { backgroundColor: themeColors.green }]}
+                  onPress={() => setTimerGame(g)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="play-circle" size={18} color="#fff" />
+                  <Text style={styles.startPlayingText}>
+                    {language === 'es' ? '¡Empezar a Jugar!' : 'Start Playing!'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
         )}
@@ -274,12 +290,12 @@ export default function DashboardScreen() {
         {upNext.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Up Next"
+              title={t('dash_up_next', language)}
               icon="bookmark"
               iconColor={themeColors.blue}
               count={upNext.length}
               action={{
-                label: 'See all',
+                label: t('dash_see_all', language),
                 onPress: () => { },
               }}
             />
@@ -297,7 +313,7 @@ export default function DashboardScreen() {
         {paused.length > 0 && (
           <View style={styles.section}>
             <SectionHeader
-              title="Paused"
+              title={t('dash_paused', language)}
               icon="pause-circle"
               iconColor={themeColors.violet}
               count={paused.length}
@@ -312,9 +328,9 @@ export default function DashboardScreen() {
         {games.length === 0 && (
           <View style={styles.empty}>
             <Ionicons name="cloud-download-outline" size={56} color={themeColors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>No games yet</Text>
+            <Text style={[styles.emptyTitle, { color: themeColors.textPrimary }]}>{t('dash_empty_title', language)}</Text>
             <Text style={[styles.emptyText, { color: themeColors.textMuted }]}>
-              Go to Settings and import your Steam library to get started.
+              {t('dash_empty_text', language)}
             </Text>
           </View>
         )}
@@ -328,6 +344,17 @@ export default function DashboardScreen() {
         onReroll={reroll}
         onClose={() => setModalVisible(false)}
       />
+
+      {timerGame && (
+        <SessionTimerModal
+          visible={!!timerGame}
+          game={timerGame}
+          onClose={(savedMinutes) => {
+            setTimerGame(null);
+            if (savedMinutes) refresh();
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -420,4 +447,19 @@ const styles = StyleSheet.create({
   dailyMeta: { fontSize: 12, fontWeight: '700', marginTop: 6 },
   celebrationTitle: { fontSize: 18, fontWeight: '800', marginBottom: 6 },
   celebrationText: { fontSize: 13, lineHeight: 20 },
+  startPlayingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 44,
+    borderRadius: 14,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  startPlayingText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
 });

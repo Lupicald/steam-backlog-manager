@@ -41,6 +41,33 @@ export function initializeDatabase(): void {
   // Ensure the new 'platform' column exists in games table
   ensureColumn(db, 'games', 'platform', `TEXT NOT NULL DEFAULT 'steam'`);
 
+  // ── Cloud sync columns (added non-destructively) ────────────────────────
+  // updated_at: ISO-8601 timestamp touched on every local write.
+  //             Used for last-write-wins conflict resolution.
+  // SQLite ALTER TABLE ADD COLUMN only allows constant defaults (no function calls).
+  // Queries always set updated_at explicitly, so '' is a safe placeholder for existing rows.
+  ensureColumn(db, 'games', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
+  // synced: 0 = dirty (needs push to Supabase), 1 = in sync.
+  ensureColumn(db, 'games', 'synced', `INTEGER NOT NULL DEFAULT 0`);
+  // remote_id: UUID assigned by Supabase after the first successful push.
+  ensureColumn(db, 'games', 'remote_id', `TEXT`);
+  // deleted_at: soft delete — NULL means active, set to ISO timestamp when user deletes.
+  ensureColumn(db, 'games', 'deleted_at', `TEXT`);
+  // device_id: UUID of the device that last modified this row (for conflict debugging).
+  ensureColumn(db, 'games', 'device_id', `TEXT`);
+  // external_id: platform-specific game ID (GOG product ID, Epic catalog ID, or Steam appid as text).
+  ensureColumn(db, 'games', 'external_id', `TEXT`);
+  // id_source: which platform's ID system external_id refers to ('steam', 'gog', 'epic').
+  ensureColumn(db, 'games', 'id_source', `TEXT DEFAULT 'steam'`);
+
+  // Composite unique index for multi-platform dedup
+  db.execSync(`CREATE UNIQUE INDEX IF NOT EXISTS idx_games_source_external
+    ON games(id_source, external_id) WHERE external_id IS NOT NULL`);
+
+  // Backfill existing Steam games with external_id from steam_app_id
+  db.execSync(`UPDATE games SET external_id = CAST(steam_app_id AS TEXT), id_source = 'steam'
+    WHERE external_id IS NULL AND steam_app_id IS NOT NULL`);
+
   // Gaming Sessions table
   db.execSync(`
     CREATE TABLE IF NOT EXISTS gaming_sessions (
@@ -81,8 +108,21 @@ export function initializeDatabase(): void {
       ('default_sort',  'priority'),
       ('show_nsfw',     'false'),
       ('theme',         'dark'),
-      ('is_premium',    'false');
+      ('is_premium',    'false'),
+      ('currency',      'usd');
   `);
+
+  // ── IGDB / Manual entry metadata columns ─────────────────────────────────
+  ensureColumn(db, 'games', 'summary', `TEXT`);
+  ensureColumn(db, 'games', 'release_year', `INTEGER`);
+  ensureColumn(db, 'games', 'genre_names', `TEXT`);
+  ensureColumn(db, 'games', 'developer_name', `TEXT`);
+  ensureColumn(db, 'games', 'publisher_name', `TEXT`);
+  ensureColumn(db, 'games', 'metadata_source', `TEXT DEFAULT 'manual'`);
+  ensureColumn(db, 'games', 'metadata_cached_at', `TEXT`);
+  ensureColumn(db, 'games', 'cover_local_path', `TEXT`);
+  ensureColumn(db, 'games', 'is_manual_entry', `INTEGER NOT NULL DEFAULT 0`);
+  ensureColumn(db, 'games', 'price_cents', `INTEGER`);
 
   // Indexes for common queries
   db.execSync(`

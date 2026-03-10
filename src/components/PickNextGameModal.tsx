@@ -18,6 +18,7 @@ import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { formatHLTBTime } from '../utils/formatters';
 import { useAppContext } from '../hooks/useAppContext';
+import { t, Language } from '../i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -28,12 +29,14 @@ interface PickNextGameModalProps {
   onClose: () => void;
 }
 
-const SESSION_OPTIONS = [
-  { label: 'Any', value: undefined },
-  { label: '1 Hr', value: 1 },
-  { label: '2 Hr', value: 2 },
-  { label: '4 Hr', value: 4 },
-];
+function getSessionOptions(lang: Language) {
+  return [
+    { label: t('modal_session_any', lang), value: undefined },
+    { label: t('modal_session_1hr', lang), value: 1 },
+    { label: t('modal_session_2hr', lang), value: 2 },
+    { label: t('modal_session_4hr', lang), value: 4 },
+  ];
+}
 
 export function PickNextGameModal({
   visible,
@@ -42,9 +45,11 @@ export function PickNextGameModal({
   onClose,
 }: PickNextGameModalProps) {
   const router = useRouter();
-  const { themeColors } = useAppContext();
+  const { themeColors, language } = useAppContext();
   const styles = getStyles(themeColors);
   const [sessionHours, setSessionHours] = useState<number | undefined>(undefined);
+
+  const SESSION_OPTIONS = getSessionOptions(language as Language);
 
   const handleReroll = () => {
     onReroll(sessionHours);
@@ -86,8 +91,8 @@ export function PickNextGameModal({
               <Ionicons name="dice" size={22} color={themeColors.accent} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>Pick My Next Game</Text>
-              <Text style={styles.headerSub}>Based on priority, time & habits</Text>
+              <Text style={styles.headerTitle}>{t('modal_pick_title', language as Language)}</Text>
+              <Text style={styles.headerSub}>{t('modal_pick_sub', language as Language)}</Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="close-circle" size={24} color={themeColors.textMuted} />
@@ -116,7 +121,7 @@ export function PickNextGameModal({
                     <View style={styles.timeRow}>
                       <Ionicons name="time-outline" size={14} color={themeColors.teal} />
                       <Text style={styles.timeText}>
-                        Main story ~{formatHLTBTime(recommendation.game.hltb_main_story)}
+                        {t('modal_main_story', language as Language)}{formatHLTBTime(recommendation.game.hltb_main_story)}
                       </Text>
                     </View>
                   ) : null}
@@ -131,7 +136,7 @@ export function PickNextGameModal({
 
               {/* Session Mode Toggles */}
               <View style={styles.sessionWrap}>
-                <Text style={styles.sessionLabel}>Session Available Time:</Text>
+                <Text style={styles.sessionLabel}>{t('modal_session_label', language as Language)}</Text>
                 <View style={styles.sessionChipsRow}>
                   {SESSION_OPTIONS.map(opt => {
                     const isActive = sessionHours === opt.value;
@@ -157,7 +162,7 @@ export function PickNextGameModal({
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.rerollButton} onPress={handleReroll} activeOpacity={0.82}>
                   <Ionicons name="refresh" size={18} color={themeColors.textPrimary} />
-                  <Text style={styles.rerollText}>Reroll</Text>
+                  <Text style={styles.rerollText}>{t('modal_reroll', language as Language)}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.ctaButton} onPress={handleOpen} activeOpacity={0.85}>
@@ -168,16 +173,16 @@ export function PickNextGameModal({
                     style={StyleSheet.absoluteFill}
                   />
                   <Ionicons name="play" size={18} color="#fff" />
-                  <Text style={styles.ctaText}>Let's Play This</Text>
+                  <Text style={styles.ctaText}>{t('modal_lets_play', language as Language)}</Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : (
             <View style={styles.empty}>
               <Ionicons name="library-outline" size={48} color={themeColors.textMuted} />
-              <Text style={styles.emptyText}>No games to recommend yet.</Text>
+              <Text style={styles.emptyText}>{t('modal_empty', language as Language)}</Text>
               <Text style={styles.emptySubText}>
-                Import your Steam library and add some games to your backlog.
+                {t('modal_empty_sub', language as Language)}
               </Text>
             </View>
           )}

@@ -23,6 +23,7 @@ import { PriorityBadge } from '../../src/components/PriorityBadge';
 import { GlassCard } from '../../src/components/GlassCard';
 import { enrichGameWithHLTB } from '../../src/services/howLongToBeatService';
 import { logSessionAndUpdateGame } from '../../src/services/gamingSessionService';
+import { SessionTimerModal } from '../../src/components/SessionTimerModal';
 import { useAppContext } from '../../src/hooks/useAppContext';
 import {
   formatMinutes,
@@ -39,7 +40,8 @@ const COVER_HEIGHT = width * 0.52;
 export default function GameDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { themeColors } = useAppContext();
+  const { themeColors, language } = useAppContext();
+  const lang = (language ?? 'en') as string;
   const { getById, setStatus, setPriority, setProgress, setNotes, remove, refresh, setBacklogExclusion } =
     useGames();
 
@@ -47,6 +49,7 @@ export default function GameDetailScreen() {
   const [notes, setNotesLocal] = useState('');
   const [sessionMinutes, setSessionMinutes] = useState('');
   const [fetching, setFetching] = useState(false);
+  const [timerVisible, setTimerVisible] = useState(false);
 
   const load = useCallback(() => {
     const g = getById(Number(id));
@@ -234,6 +237,18 @@ export default function GameDetailScreen() {
               </View>
             )}
           </GlassCard>
+
+          {/* ── Start Playing button ── */}
+          <TouchableOpacity
+            style={[styles.startPlayingBtn, { backgroundColor: themeColors.green }]}
+            onPress={() => setTimerVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="play-circle" size={22} color="#fff" />
+            <Text style={styles.startPlayingText}>
+              {lang === 'es' ? '¡Empezar a Jugar!' : 'Start Playing!'}
+            </Text>
+          </TouchableOpacity>
 
           {/* Log Session */}
           <GlassCard style={styles.card} padding={16}>
@@ -448,6 +463,18 @@ export default function GameDetailScreen() {
           <View style={{ height: 100 }} />
         </View>
       </ScrollView>
+
+      <SessionTimerModal
+        visible={timerVisible}
+        game={game}
+        onClose={(savedMinutes) => {
+          setTimerVisible(false);
+          if (savedMinutes) {
+            refresh();
+            load();
+          }
+        }}
+      />
     </View>
   );
 }
@@ -619,4 +646,18 @@ const styles = StyleSheet.create({
   },
   sessionBtn: { paddingHorizontal: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   sessionBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  startPlayingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  startPlayingText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '800',
+  },
 });

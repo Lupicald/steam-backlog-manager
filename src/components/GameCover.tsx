@@ -28,19 +28,21 @@ export function GameCover({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const { themeColors } = useAppContext();
+  const normalizedUri = typeof uri === 'string' ? uri.trim() : '';
+  const showPlaceholder = error || !normalizedUri;
 
   return (
     <View
       style={[styles.wrapper, { width, height, borderRadius: radius, backgroundColor: themeColors.card }, style]}
     >
-      {error ? (
+      {showPlaceholder ? (
         <View style={[styles.placeholder, { borderRadius: radius, backgroundColor: themeColors.card }]}>
           <Ionicons name="game-controller" size={28} color={themeColors.textMuted} />
         </View>
       ) : (
         <>
           <Image
-            source={{ uri }}
+            source={{ uri: normalizedUri }}
             style={[styles.image, { borderRadius: radius }]}
             onLoad={() => setLoading(false)}
             onError={() => {

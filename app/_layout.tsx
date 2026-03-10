@@ -1,46 +1,142 @@
-import { useEffect } from 'react';
+import React, { Component, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import 'react-native-reanimated';
 import { useDatabase } from '../src/hooks/useDatabase';
 import { AppProvider } from '../src/hooks/useAppContext';
+import { getSetting, setSetting } from '../src/database/queries';
+import OnboardingScreen from '../src/screens/OnboardingScreen';
+import AuthScreen from '../src/screens/AuthScreen';
+import { t, Language } from '../src/i18n';
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+
+interface ErrorState { hasError: boolean; message: string }
+
+class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorState> {
+  state: ErrorState = { hasError: false, message: '' };
+
+  static getDerivedStateFromError(error: Error): ErrorState {
+    return { hasError: true, message: error.message ?? 'Unknown error' };
+  }
+
+  componentDidCatch(error: Error) {
+    // Log to console — integrate Sentry here when ready
+    console.error('[ErrorBoundary]', error);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    const lang = (getSetting('language') as Language) || 'en';
+    return (
+      <View style={ebStyles.root}>
+        <Text style={ebStyles.icon}>⚠️</Text>
+        <Text style={ebStyles.title}>{t('eb_title', lang)}</Text>
+        <Text style={ebStyles.msg}>{this.state.message}</Text>
+        <TouchableOpacity
+          style={ebStyles.btn}
+          onPress={() => this.setState({ hasError: false, message: '' })}
+        >
+          <Text style={ebStyles.btnText}>{t('eb_btn', lang)}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+}
+
+const ebStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#0a0a14',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 16,
+  },
+  icon: { fontSize: 52 },
+  title: { color: '#f0f0f0', fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  msg: { color: '#a0a0b8', fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  btn: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 24,
+    paddingVertical: 13,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+});
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const { ready } = useDatabase();
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [authPrompted, setAuthPrompted] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (ready) {
+      const done = getSetting('onboarding_completed') === 'true';
+      const prompted = getSetting('auth_prompted') === 'true';
+      setOnboardingDone(done);
+      setAuthPrompted(prompted);
       SplashScreen.hideAsync();
     }
   }, [ready]);
 
-  if (!ready) {
+  if (!ready || onboardingDone === null || authPrompted === null) {
     return null;
   }
 
+  if (!onboardingDone) {
+    return (
+      <ErrorBoundary>
+        <AppProvider>
+          <StatusBar style="light" />
+          <OnboardingScreen onComplete={() => setOnboardingDone(true)} />
+        </AppProvider>
+      </ErrorBoundary>
+    );
+  }
+
+  if (!authPrompted) {
+    const markDone = () => {
+      setSetting('auth_prompted', 'true');
+      setAuthPrompted(true);
+    };
+    return (
+      <ErrorBoundary>
+        <AppProvider>
+          <StatusBar style="light" />
+          <AuthScreen onSuccess={markDone} onSkip={markDone} />
+        </AppProvider>
+      </ErrorBoundary>
+    );
+  }
+
   return (
-    <AppProvider>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: '#0a0a14' },
-          animation: 'fade_from_bottom',
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="game/[id]"
-          options={{
+    <ErrorBoundary>
+      <AppProvider>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
             headerShown: false,
-            animation: 'slide_from_right',
-            presentation: 'card',
+            contentStyle: { backgroundColor: '#0a0a14' },
+            animation: 'fade_from_bottom',
           }}
-        />
-      </Stack>
-    </AppProvider>
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="game/[id]"
+            options={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              presentation: 'card',
+            }}
+          />
+        </Stack>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

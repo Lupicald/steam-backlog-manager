@@ -14,6 +14,7 @@ import { Game, GameStatus, STATUS_CONFIG } from '../types';
 import { GameCover } from './GameCover';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
+import { PlatformBadge } from './PlatformBadge';
 import {
   formatMinutes,
   formatHLTBTime,
@@ -22,6 +23,7 @@ import {
   truncate,
 } from '../utils/formatters';
 import { useAppContext } from '../hooks/useAppContext';
+import { t } from '../i18n';
 import { ThemeColors } from '../services/themeService';
 
 interface GameCardProps {
@@ -40,7 +42,7 @@ const STATUS_CYCLE: GameStatus[] = [
 ];
 
 export function GameCard({ game, onStatusChange, compact = false }: GameCardProps) {
-  const { themeColors } = useAppContext();
+  const { themeColors, language } = useAppContext();
   const styles = React.useMemo(() => getStyles(themeColors), [themeColors]);
   const router = useRouter();
   const statusConfig = STATUS_CONFIG[game.status];
@@ -99,6 +101,9 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
           <View style={styles.badges}>
             <StatusBadge status={game.status} size="sm" />
             <PriorityBadge priority={game.priority} size="sm" />
+            {game.platform !== 'steam' && (
+              <PlatformBadge platform={game.platform} size="sm" />
+            )}
           </View>
 
           <View style={styles.meta}>
@@ -114,7 +119,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
               <View style={styles.metaItem}>
                 <Ionicons name="game-controller-outline" size={11} color={themeColors.textMuted} />
                 <Text style={styles.metaText}>
-                  {formatMinutes(game.playtime_minutes)} played
+                  {formatMinutes(game.playtime_minutes)} {t('gc_played', language)}
                 </Text>
               </View>
             ) : null}
@@ -122,7 +127,7 @@ export function GameCard({ game, onStatusChange, compact = false }: GameCardProp
               <View style={styles.metaItem}>
                 <Ionicons name="hourglass-outline" size={11} color={themeColors.teal} />
                 <Text style={[styles.metaText, styles.remainingText]}>
-                  {formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} left
+                  {formatRemainingTime(game.hltb_main_story, game.playtime_minutes)} {t('gc_left', language)}
                 </Text>
               </View>
             ) : null}

@@ -41,7 +41,6 @@ Thumbs.db
 *.apk
 *.aab
 *.ipa
-*.png
 
 # SQLite
 *.db
@@ -53,3 +52,21 @@ Thumbs.db
 # Temporary
 tsc_output.txt
 *.log
+tsc.txt
+typescript_errors.txt
+
+# Projects / Secrets
+.claude/
+*.json
+!package.json
+!package-lock.json
+!app.json
+!tsconfig.json
+!eas.json
+!credentials.json # Usually ignored but listed for clarity
+
+# Specific secrets
+games-backlog-*.json
+
+# Assets/Images
+ChatGPT Image *.png

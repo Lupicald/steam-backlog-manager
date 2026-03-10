@@ -126,6 +126,15 @@ npx expo start
 
 Scan the QR code with Expo Go (Android) or the Camera app (iOS).
 
+### 4. Deploy the Epic OAuth proxy
+
+Epic login now exchanges and refreshes tokens through a Supabase Edge Function so `EPIC_CLIENT_SECRET` is not shipped in the app bundle.
+
+```bash
+supabase secrets set EPIC_CLIENT_ID=your_epic_client_id EPIC_CLIENT_SECRET=your_epic_client_secret
+supabase functions deploy epic-oauth
+```
+
 ---
 
 ## Steam API Setup
