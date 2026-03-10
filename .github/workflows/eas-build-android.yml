@@ -39,6 +39,8 @@ jobs:
         run: |
           mkdir -p .credentials
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > .credentials/android-upload-keystore.jks
+          keytool -list -keystore .credentials/android-upload-keystore.jks \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -v | head -5
 
       - name: Build release AAB
         run: |
