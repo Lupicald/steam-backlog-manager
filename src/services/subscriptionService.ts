@@ -22,7 +22,7 @@ import Purchases, {
   LOG_LEVEL,
 } from 'react-native-purchases';
 import { setSetting, getSetting } from '../database/queries';
-import { RC_ANDROID_API_KEY, RC_IOS_API_KEY, RC_ENTITLEMENT_ID } from '../config/revenuecat';
+import { RC_ANDROID_API_KEY, RC_ENTITLEMENT_ID } from '../config/revenuecat';
 
 /** The RevenueCat entitlement identifier configured in the RC dashboard. */
 export const ENTITLEMENT_ID = RC_ENTITLEMENT_ID;
@@ -53,8 +53,10 @@ export async function initializeSubscriptions(): Promise<void> {
     Purchases.setLogLevel(LOG_LEVEL.DEBUG);
   }
 
+  if (Platform.OS !== 'android') return;
+
   Purchases.configure({
-    apiKey: Platform.OS === 'ios' ? RC_IOS_API_KEY : RC_ANDROID_API_KEY,
+    apiKey: RC_ANDROID_API_KEY,
   });
 
   // Warm the local cache on startup.

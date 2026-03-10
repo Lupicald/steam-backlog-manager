@@ -13,7 +13,6 @@
  */
 
 export const RC_ANDROID_API_KEY = 'goog_IvHJULqJCHsOQPJkLzMuYfLhkFx';
-export const RC_IOS_API_KEY = 'test_IRoJyPXslDGSoKPAztkeEHieVlp';
 
 /** The entitlement identifier configured in the RevenueCat dashboard. */
 export const RC_ENTITLEMENT_ID = 'premium';
